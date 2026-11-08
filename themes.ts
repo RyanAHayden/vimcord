@@ -5,8 +5,7 @@
  */
 
 // Themes to pick instead of your own: each one's terminal palette, and the colors its nvim colorscheme gives the
-// highlight groups vimcord copies (lualine's modes, CursorLine, Visual, borders, which-key). Tokyo Night is also
-// what the look falls back to when there's no theme to read at all.
+// highlight groups vimcord copies (lualine's modes, CursorLine, Visual, borders, which-key).
 
 export type Hl = Record<string, { fg?: string; bg?: string; }>;
 

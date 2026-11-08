@@ -86,7 +86,7 @@ Two settings (Settings → Plugins → VimCord), in any combination:
 
 - **TUI style**: [system24](https://github.com/refact0r/system24)'s (refact0r, MIT) bordered panels with lazygit-style numbered labels, in your terminal's font. Off keeps Discord's layout: the bar, popups and keys stay, and themed colors use [midnight](https://github.com/refact0r/midnight-discord), the flat theme system24 is built on.
 - **Colors**:
-  - **Your theme** (default): **nvim's own highlight groups**. vimcord runs nvim headless with your config (about 0.4s, and only when your terminal's palette changes) and copies lualine's mode colors, CursorLine, Visual, FloatBorder and which-key's colors. Without nvim, your terminal's palette stands in: Omarchy's current theme (`~/.config/omarchy/current/theme/colors.toml`), else Ghostty (following `config-file` includes), Alacritty or Kitty, re-read every few seconds so switching Omarchy themes switches Discord's too. With no theme anywhere, it's Tokyo Night.
+  - **Your theme** (default): **nvim's own highlight groups**. vimcord runs nvim headless with your config (about 0.4s, and only when your terminal's palette changes) and copies lualine's mode colors, CursorLine, Visual, FloatBorder and which-key's colors. Without nvim, your terminal's palette stands in: Omarchy's current theme (`~/.config/omarchy/current/theme/colors.toml`), else Ghostty (following `config-file` includes), Alacritty or Kitty, re-read every few seconds so switching Omarchy themes switches Discord's too. With no theme anywhere, it's Discord's own colors.
   - **A fixed theme**: Tokyo Night, Catppuccin Mocha, Gruvbox, Nord, Rosé Pine or Kanagawa, with their nvim colorschemes' mode and highlight colors.
   - **Discord's own colors**.
 

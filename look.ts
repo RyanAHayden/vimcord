@@ -8,7 +8,7 @@
 // groups, so it's whatever colorscheme nvim has, Omarchy's current theme included), in the terminal's font.
 // vimcord's pieces copy nvim's: the bar is lualine, the cursor is CursorLine, the selection Visual, floats have
 // FloatBorder, which-key its own colors. Without nvim, the terminal's palette stands in, mapped the same way; with
-// no theme at all, Tokyo Night.
+// no theme at all, Discord's own colors.
 // The terminal's palette is re-read every few seconds; when it changes (an Omarchy theme switch), nvim is asked again.
 
 import { PluginNative } from "@utils/types";
@@ -23,8 +23,8 @@ const SYSTEM24 = "https://refact0r.github.io/system24/build/system24.css";
 // system24 without its TUI panels: refact0r's flat theme it's built on, same color variables
 const MIDNIGHT = "https://refact0r.github.io/midnight-discord/build/midnight.css";
 
+// fills in whatever a partial palette leaves out
 const TOKYONIGHT = THEMES.tokyonight.palette;
-const TOKYONIGHT_HL = THEMES.tokyonight.hl;
 
 export const themeOptions = Object.entries(THEMES).map(([value, t]) => ({ label: t.name, value }));
 
@@ -241,8 +241,7 @@ body.vimcord-look ::-webkit-scrollbar { width: 6px !important; height: 6px !impo
 body.vimcord-look ::-webkit-scrollbar-thumb { background: var(--vc-border) !important; border: none !important; }
 body.vimcord-look ::-webkit-scrollbar-track { background: transparent !important; }`;
 
-function css(t: Terminal, h: Hl) {
-    const discordColors = opts.colors === "discord";
+function css(t: Terminal, h: Hl, discordColors: boolean) {
     const font = opts.font || t.font || "JetBrainsMono Nerd Font";
     const fontStack = `'${font.replace(/'/g, "")}', 'JetBrainsMono Nerd Font', 'JetBrains Mono', monospace`;
     const parts: string[] = [];
@@ -261,11 +260,12 @@ function css(t: Terminal, h: Hl) {
 function apply() {
     if (!term) return;
     const preset = THEMES[opts.colors];
-    // a picked theme replaces your colors (the terminal's font stays); with no theme anywhere, Tokyo Night's nvim
-    // colors as well as its palette
+    // a picked theme replaces your colors (the terminal's font stays); "your theme" with no theme anywhere (no nvim,
+    // terminal colors or Omarchy) is Discord's own colors
     const t = preset ? { ...term, colors: preset.palette } : term;
-    const h = preset ? preset.hl : hl && Object.keys(hl).length ? hl : term.source ? {} : TOKYONIGHT_HL;
-    const text = css(t, h);
+    const h = preset ? preset.hl : hl ?? {};
+    const noTheme = opts.colors === "auto" && !term.source && !Object.keys(h).length;
+    const text = css(t, h, opts.colors === "discord" || noTheme);
     if (text === last) return;
     last = text;
     style ??= document.head.appendChild(Object.assign(document.createElement("style"), { id: "vimcord-look" }));
