@@ -63,6 +63,9 @@ let membersPeeking = false;
 let onChange = () => { };
 
 export const current = () => focused;
+
+/** keeps the member list's box marked as Discord re-renders it (called with the rest of the mode display) */
+export const tick = () => void markMembersBox();
 export const isZoomed = () => zoomed;
 export const setOnChange = (fn: () => void) => void (onChange = fn);
 
@@ -105,11 +108,21 @@ function applyClasses() {
     onChange();
 }
 
+// marks the member list's box for the look's "[4] members" label (CSS can only find it with a slow :has())
+function markMembersBox() {
+    const box = document.querySelector('[class*="membersWrap_"]')?.parentElement;
+    if (box && !box.hasAttribute("data-vimcord-members-box")) box.setAttribute("data-vimcord-members-box", "");
+    return box;
+}
+
 function paint() {
-    for (const el of document.querySelectorAll(`[${ITEM}], [${FOCUS}]`)) {
+    for (const el of document.querySelectorAll(`[${ITEM}], [${FOCUS}], [data-vimcord-pane-label]`)) {
         el.removeAttribute(ITEM);
         el.removeAttribute(FOCUS);
+        el.removeAttribute("data-vimcord-pane-label");
     }
+    const box = markMembersBox();
+    if (focused === "members") box?.setAttribute("data-vimcord-pane-label", "");
     if (focused === "messages") return;
     const pane = lists[focused];
     pane.container()?.setAttribute(FOCUS, "");

@@ -229,7 +229,7 @@ body.vimcord-look {
 }
 
 /* panel labels like lazygit's: the pane's number for 1-4, in the border, the focused one in the mode's color */
-body.vimcord-look :is([class*="guilds_"], [class*="panels_"], [class*="sidebarList_"], [class*="subtitleContainer_"], [class*="messagesWrapper_"], [class*="channelTextArea_"], :has(> [class*="membersWrap_"]))::after {
+body.vimcord-look :is([class*="guilds_"], [class*="panels_"], [class*="sidebarList_"], [class*="subtitleContainer_"], [class*="messagesWrapper_"], [class*="channelTextArea_"], [data-vimcord-members-box])::after {
     color: var(--vc-muted) !important;
     background: var(--vc-bg) !important;
     white-space: nowrap !important;
@@ -238,12 +238,13 @@ body.vimcord-look [class*="guilds_"]::after { content: "[1] nav" !important; }
 /* further in than the others, so the server column's "[1] nav" (wider than its column) doesn't run into it */
 body.vimcord-look [class*="sidebarList_"]::after { content: "[2] channels" !important; left: 32px !important; }
 body.vimcord-look [class*="messagesWrapper_"]::after { content: "[3] " var(--vc-chat-label, "chat") !important; }
-/* system24 labels the member list's container; the list itself would get a second label */
-body.vimcord-look :has(> [class*="membersWrap_"])::after { content: "[4] members" !important; }
-body.vimcord-look :has(> [class*="membersWrap_"]) > [class*="membersWrap_"]::after { content: none !important; }
+/* system24 labels the member list's container (which panes.ts marks, since a :has() for it would make every DOM
+   change recheck the whole page); the list itself would get a second label */
+body.vimcord-look [data-vimcord-members-box]::after { content: "[4] members" !important; }
+body.vimcord-look [data-vimcord-members-box] > [class*="membersWrap_"]::after { content: none !important; }
 body.vimcord-look:not(.vimcord-list-focused):not(.vimcord-insert) [class*="messagesWrapper_"]::after,
 body.vimcord-look [data-vimcord-pane]::after,
-body.vimcord-look :has(> [data-vimcord-pane][class*="membersWrap_"])::after { color: var(--vc-normal) !important; }
+body.vimcord-look [data-vimcord-members-box][data-vimcord-pane-label]::after { color: var(--vc-normal) !important; }
 body.vimcord-look.vimcord-visual [class*="messagesWrapper_"]::after { color: var(--vc-visual) !important; }
 body.vimcord-look.vimcord-insert [class*="channelTextArea_"]:focus-within::after { color: var(--vc-insert) !important; }
 body.vimcord-look [data-vimcord-pane] { outline: none !important; border-color: var(--vc-normal) !important; }
@@ -251,7 +252,7 @@ body.vimcord-look [data-vimcord-pane] { outline: none !important; border-color: 
 /* the start-of-channel title: one clean line instead of the big heading and buttons */
 body.vimcord-look [class*="emptyChannelIcon_"],
 body.vimcord-look [class*="channelSettingButtons_"] { display: none !important; }
-body.vimcord-look :has(> [class*="emptyChannelIcon_"]) > h3 {
+body.vimcord-look [class*="emptyChannelIcon_"] + h3 {
     font-family: var(--vc-font) !important;
     font-size: 16px !important;
     font-weight: 700 !important;

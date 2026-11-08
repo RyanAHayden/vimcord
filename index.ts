@@ -43,6 +43,7 @@ function update() {
     c.toggle("vimcord-visual", m === "VISUAL");
     c.toggle("vimcord-has-bar", settings.store.statusBar);
     if ((m === "NORMAL" || m === "VISUAL") && panes.current() === "messages") cursor.place();
+    panes.tick();
     if (settings.store.statusBar) statusbar.render(m, panes.current(), pending, settings.store.statusBarHints);
     else statusbar.remove();
 }
