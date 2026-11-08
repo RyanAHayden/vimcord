@@ -12,7 +12,8 @@ import { bindings, continuations, prefixNames } from "./keymap";
 let whichKey: HTMLElement | null = null;
 let help: HTMLElement | null = null;
 
-const pretty = (k: string) => k.replaceAll("<Space>", "␣ ").replace(/<C-(.)>/g, "Ctrl-$1").replaceAll("<CR>", "Enter");
+const pretty = (k: string) => k.replaceAll("<Space>", "␣ ").replace(/<C-(.)>/g, "Ctrl-$1").replaceAll("<CR>", "Enter")
+    .replaceAll("<S-Tab>", "Shift-Tab").replaceAll("<Tab>", "Tab");
 
 function el(tag: string, cls: string, text?: string) {
     const e = document.createElement(tag);

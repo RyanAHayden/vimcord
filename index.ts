@@ -5,7 +5,7 @@
  */
 
 import definePlugin from "@utils/types";
-import { FluxDispatcher, PendingReplyStore, SelectedChannelStore } from "@webpack/common";
+import { AccessibilityStore, FluxDispatcher, PendingReplyStore, SelectedChannelStore } from "@webpack/common";
 
 import * as cursor from "./cursor";
 import { keybind, logger } from "./discord";
@@ -112,6 +112,7 @@ function keyName(e: KeyboardEvent): string | null {
     if (e.ctrlKey) return k.length === 1 ? `<C-${k.toLowerCase()}>` : null;
     if (k === " ") return "<Space>";
     if (k === "Enter") return "<CR>";
+    if (k === "Tab") return e.shiftKey ? "<S-Tab>" : "<Tab>";
     return k.length === 1 ? k : null;
 }
 
@@ -163,6 +164,8 @@ function handleKey(e: KeyboardEvent) {
 
     const key = keyName(e);
     if (key == null) return;
+    // with Discord's keyboard mode allowed, Tab is Discord's (hopping between buttons)
+    if ((key === "<Tab>" || key === "<S-Tab>") && settings.store.discordKeyboardMode) return;
 
     // Esc always stays in normal mode (Discord's would jump to the message box from a focused message). Each press
     // backs out of one thing: keys typed so far, visual mode, a list pane, a pending reply, then marks the channel read
@@ -265,6 +268,10 @@ function onInsertKey(e: KeyboardEvent, target: HTMLElement) {
     target.dispatchEvent(arrow);
 }
 
+function keyboardModeOff() {
+    if (AccessibilityStore.keyboardModeEnabled) FluxDispatcher.dispatch({ type: "ACCESSIBILITY_KEYBOARD_MODE_DISABLE" });
+}
+
 function onMouseDown(e: MouseEvent) {
     cursor.onClick(e);
     panes.onClick(e);
@@ -288,6 +295,7 @@ export default definePlugin({
         cursor.setScrollOff(settings.store.scrollOff);
         applyLook();
         look.windowButtons(!settings.store.hideWindowButtons);
+        if (!settings.store.discordKeyboardMode) keyboardModeOff();
         panes.setOnChange(schedule);
         setOnSettingsChange(schedule);
         applyHidden();
@@ -323,6 +331,10 @@ export default definePlugin({
     },
 
     flux: {
+        // Discord's keyboard mode (Tab between buttons, focus outlines) gets in the way of vimcord's: switch it back off
+        ACCESSIBILITY_KEYBOARD_MODE_ENABLE() {
+            if (!settings.store.discordKeyboardMode) setTimeout(keyboardModeOff);
+        },
         CHANNEL_SELECT() {
             reset();
             cursor.clear();

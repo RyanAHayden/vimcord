@@ -17,8 +17,10 @@ function applyHidden() {
 }
 
 export function applyLook() {
-    if (settings.store.look === "nvim") look.enable({ colorsFile: settings.store.colorsFile, font: settings.store.font });
-    else look.disable();
+    const { tuiStyle, colors, colorsFile, font } = settings.store;
+    // Discord's layout in Discord's colors: nothing to restyle (vimcord's own pieces follow Discord's variables)
+    if (!tuiStyle && colors === "discord") look.disable();
+    else look.enable({ tui: tuiStyle, colors: colors ?? "auto", colorsFile, font });
 }
 
 export function onResize() {
@@ -30,24 +32,31 @@ let onSettingsChange = () => { };
 export const setOnSettingsChange = (fn: () => void) => void (onSettingsChange = fn);
 
 export const settings = definePluginSettings({
-    look: {
+    tuiStyle: {
+        type: OptionType.BOOLEAN,
+        description: "TUI style: system24's bordered, labelled panels like a terminal app. Off keeps Discord's layout (the bar, popups and keys stay)",
+        default: true,
+        onChange: () => applyLook(),
+    },
+    colors: {
         type: OptionType.SELECT,
-        description: "Look: like nvim in your terminal (system24's panels in your terminal's colors and font, following Omarchy's current theme), or leave Discord's look alone",
+        description: "Colors: your theme (nvim's colors, else your terminal's or Omarchy's), a fixed theme, or Discord's own",
         options: [
-            { label: "nvim (your terminal's colors and font)", value: "nvim", default: true },
-            { label: "Off: keep Discord's / your theme's look", value: "off" },
+            { label: "Your theme (nvim / terminal / Omarchy)", value: "auto", default: true },
+            ...look.themeOptions,
+            { label: "Discord's own colors", value: "discord" },
         ],
         onChange: () => applyLook(),
     },
     colorsFile: {
         type: OptionType.STRING,
-        description: "Colors file for the nvim look. Empty: Omarchy's current theme, else your Ghostty, Alacritty or Kitty config. Or a path to a colors.toml, alacritty.toml, ghostty or kitty config",
+        description: "With \"Your theme\": the colors file to read. Empty: Omarchy's current theme, else your Ghostty, Alacritty or Kitty config. Or a path to a colors.toml, alacritty.toml, ghostty or kitty config",
         default: "",
         onChange: () => applyLook(),
     },
     font: {
         type: OptionType.STRING,
-        description: "Font for the nvim look. Empty: your terminal's",
+        description: "Font for the TUI style and themed colors. Empty: your terminal's",
         default: "",
         onChange: () => applyLook(),
     },
@@ -108,6 +117,11 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Ignore unmapped letters when not typing, instead of Discord starting a message with them. Press i to type",
         default: true,
+    },
+    discordKeyboardMode: {
+        type: OptionType.BOOLEAN,
+        description: "Let Discord's keyboard mode stay on (Tab hopping between buttons, with focus outlines). Off: Tab cycles vimcord's panes, and the outlines stay away",
+        default: false,
     },
     escapeLeavesInput: {
         type: OptionType.BOOLEAN,

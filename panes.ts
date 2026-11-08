@@ -168,6 +168,12 @@ export function step(dir: 1 | -1) {
     focus(order[Math.max(0, Math.min(order.length - 1, i + dir))]);
 }
 
+/** Tab / Shift-Tab: the next or previous pane, wrapping around */
+export function cycle(dir: 1 | -1) {
+    const i = order.indexOf(focused);
+    focus(order[(i + dir + order.length) % order.length]);
+}
+
 export function move(n: number) {
     if (focused === "messages") return cursor.move(n);
     const pane = lists[focused];

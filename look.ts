@@ -15,54 +15,32 @@ import { PluginNative } from "@utils/types";
 
 import { logger } from "./discord";
 import type { Terminal } from "./native";
+import { Hl, THEMES } from "./themes";
 
 const Native = VencordNative.pluginHelpers.VimCord as PluginNative<typeof import("./native")>;
 
 const SYSTEM24 = "https://refact0r.github.io/system24/build/system24.css";
+// system24 without its TUI panels: refact0r's flat theme it's built on, same color variables
+const MIDNIGHT = "https://refact0r.github.io/midnight-discord/build/midnight.css";
 
-type Hl = Record<string, { fg?: string; bg?: string; }>;
+const TOKYONIGHT = THEMES.tokyonight.palette;
+const TOKYONIGHT_HL = THEMES.tokyonight.hl;
 
-// with no theme to read (no Omarchy, no terminal colors, no nvim): Tokyo Night, as tokyonight.nvim draws it
-const TOKYONIGHT: Record<string, string> = {
-    background: "#1a1b26", foreground: "#c0caf5", cursor: "#c0caf5",
-    selection_background: "#283457", selection_foreground: "#c0caf5",
-    color0: "#15161e", color1: "#f7768e", color2: "#9ece6a", color3: "#e0af68",
-    color4: "#7aa2f7", color5: "#bb9af7", color6: "#7dcfff", color7: "#a9b1d6",
-    color8: "#414868", color9: "#ff899d", color10: "#9fe044", color11: "#faba4a",
-    color12: "#8db0ff", color13: "#c7a9ff", color14: "#a4daff", color15: "#c0caf5",
-};
-
-const TOKYONIGHT_HL: Hl = {
-    Normal: { fg: "#c0caf5", bg: "#1a1b26" },
-    CursorLine: { bg: "#292e42" },
-    Visual: { bg: "#283457" },
-    FloatBorder: { fg: "#27a1b9" },
-    FloatTitle: { fg: "#27a1b9" },
-    WinSeparator: { fg: "#3b4261" },
-    Comment: { fg: "#565f89" },
-    Title: { fg: "#7aa2f7" },
-    Special: { fg: "#2ac3de" },
-    Directory: { fg: "#7aa2f7" },
-    Search: { bg: "#3d59a1" },
-    CursorLineNr: { fg: "#ff9e64" },
-    DiagnosticError: { fg: "#db4b4b" },
-    DiagnosticWarn: { fg: "#e0af68" },
-    lualine_a_normal: { fg: "#15161e", bg: "#7aa2f7" },
-    lualine_a_insert: { fg: "#15161e", bg: "#9ece6a" },
-    lualine_a_visual: { fg: "#15161e", bg: "#bb9af7" },
-    lualine_a_command: { fg: "#15161e", bg: "#e0af68" },
-    lualine_b_normal: { fg: "#7aa2f7", bg: "#3b4261" },
-    lualine_c_normal: { fg: "#a9b1d6", bg: "#16161e" },
-    WhichKey: { fg: "#7dcfff" },
-    WhichKeyGroup: { fg: "#7aa2f7" },
-    WhichKeyDesc: { fg: "#bb9af7" },
-    WhichKeySeparator: { fg: "#565f89" },
-};
+export const themeOptions = Object.entries(THEMES).map(([value, t]) => ({ label: t.name, value }));
 
 let style: HTMLStyleElement | null = null;
 let timer: ReturnType<typeof setInterval> | undefined;
 let last = "";
-let opts = { colorsFile: "", font: "" };
+export interface LookOptions {
+    /** system24's TUI panels (else Discord's layout) */
+    tui: boolean;
+    /** "auto": nvim / the terminal / Omarchy; a THEMES key; or "discord" for Discord's own colors */
+    colors: string;
+    colorsFile: string;
+    font: string;
+}
+
+let opts: LookOptions = { tui: true, colors: "auto", colorsFile: "", font: "" };
 let term: Terminal | null = null;
 let hl: Hl | null = null;
 let hlFor = "";
@@ -112,19 +90,13 @@ function scheme(t: Terminal, h: Hl) {
     };
 }
 
-function css(t: Terminal, h: Hl) {
+function colorVars(t: Terminal, h: Hl, fontStack: string) {
     const s = scheme(t, h);
     const { bg, fg } = s;
-    const font = opts.font || t.font || "JetBrainsMono Nerd Font";
-    const fontStack = `'${font.replace(/'/g, "")}', 'JetBrainsMono Nerd Font', 'JetBrains Mono', monospace`;
-
     // system24's five shades per hue: bright, normal, then the normal sinking toward the background
     const hue = (name: string, [normal, bright]: string[]) =>
         `--${name}-1: ${bright}; --${name}-2: ${normal}; --${name}-3: ${mix(normal, bg, 85)}; --${name}-4: ${mix(normal, bg, 70)}; --${name}-5: ${mix(normal, bg, 55)};`;
-
-    return `@import url('${SYSTEM24}');
-
-:root:root {
+    return `:root:root {
     color-scheme: dark;
     --colors: on;
     --text-0: ${bg};
@@ -193,9 +165,12 @@ function css(t: Terminal, h: Hl) {
     --vc-desc: ${s.desc};
     --vc-sep: ${s.sep};
     --vc-error: ${s.error};
+}`;
 }
 
-body.vimcord-look {
+/** system24's options for the TUI look, the numbered pane labels, and the cleaner start-of-channel title */
+function tuiStyle(fontStack: string) {
+    return `body.vimcord-look {
     --font: ${fontStack};
     --code-font: ${fontStack};
     font-weight: 400;
@@ -258,20 +233,39 @@ body.vimcord-look [class*="emptyChannelIcon_"] + h3 {
     font-weight: 700 !important;
     color: var(--vc-strong) !important;
     margin: 8px 0 2px !important;
+}`;
 }
 
-/* thin scrollbars, like nvim's (which has none) */
+const SCROLLBARS = `/* thin scrollbars, like nvim's (which has none) */
 body.vimcord-look ::-webkit-scrollbar { width: 6px !important; height: 6px !important; }
 body.vimcord-look ::-webkit-scrollbar-thumb { background: var(--vc-border) !important; border: none !important; }
-body.vimcord-look ::-webkit-scrollbar-track { background: transparent !important; }
-`;
+body.vimcord-look ::-webkit-scrollbar-track { background: transparent !important; }`;
+
+function css(t: Terminal, h: Hl) {
+    const discordColors = opts.colors === "discord";
+    const font = opts.font || t.font || "JetBrainsMono Nerd Font";
+    const fontStack = `'${font.replace(/'/g, "")}', 'JetBrainsMono Nerd Font', 'JetBrains Mono', monospace`;
+    const parts: string[] = [];
+    if (opts.tui) parts.push(`@import url('${SYSTEM24}');`);
+    else if (!discordColors) parts.push(`@import url('${MIDNIGHT}');`);
+    if (discordColors) {
+        // system24's own switch for Discord's colors; vimcord's pieces follow Discord's variables (style.css)
+        parts.push(":root:root { --colors: off; }");
+    } else parts.push(colorVars(t, h, fontStack));
+    if (opts.tui) parts.push(tuiStyle(fontStack));
+    else if (!discordColors) parts.push(`body.vimcord-look { --font: ${fontStack}; --code-font: ${fontStack}; --animations: off; }`);
+    parts.push(SCROLLBARS);
+    return parts.join("\n\n");
 }
 
 function apply() {
     if (!term) return;
-    // no theme anywhere: Tokyo Night's nvim colors too, not just its palette
-    const h = hl && Object.keys(hl).length ? hl : term.source ? {} : TOKYONIGHT_HL;
-    const text = css(term, h);
+    const preset = THEMES[opts.colors];
+    // a picked theme replaces your colors (the terminal's font stays); with no theme anywhere, Tokyo Night's nvim
+    // colors as well as its palette
+    const t = preset ? { ...term, colors: preset.palette } : term;
+    const h = preset ? preset.hl : hl && Object.keys(hl).length ? hl : term.source ? {} : TOKYONIGHT_HL;
+    const text = css(t, h);
     if (text === last) return;
     last = text;
     style ??= document.head.appendChild(Object.assign(document.createElement("style"), { id: "vimcord-look" }));
@@ -291,6 +285,7 @@ async function refresh() {
     }
     if (!timer) return;
     apply();
+    if (opts.colors !== "auto") return;
     // nvim's colors follow the theme: ask nvim again when the terminal's palette changes (an Omarchy theme switch)
     const key = JSON.stringify(term.colors);
     if (key !== hlFor) {
@@ -310,7 +305,7 @@ export function windowButtons(visible: boolean) {
     if (navigator.platform.startsWith("Mac")) Native.setWindowButtons(visible).catch(e => logger.error("window buttons", e));
 }
 
-export function enable(o: { colorsFile: string; font: string; }) {
+export function enable(o: LookOptions) {
     opts = o;
     last = "";
     hlFor = "";

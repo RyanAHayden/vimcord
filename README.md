@@ -31,6 +31,7 @@ Then enable **VimCord** in Vencord's plugin settings and restart Discord. To upd
 | Panes | |
 |---|---|
 | `1` `2` `3` `4` | focus servers, channels, messages, members |
+| `Tab` / `Shift-Tab` | next / previous pane (wraps around) |
 | `Ctrl-h` / `Ctrl-l` | pane to the left / right |
 | `Enter` `l` `o` | open the highlighted server, channel or member |
 | `/` | in the channels or servers pane: fuzzy-find in it |
@@ -79,22 +80,24 @@ A hidden pane shows while it's focused. The channel and member lists hide on the
 
 Plus `Space p` pins, `Space i` inbox, `Space a` attach a file, `Space r` mark server read, `Space s k` search keys.
 
-## The nvim look
+## The look
 
-On by default (Settings → Plugins → VimCord → Look):
+Two settings (Settings → Plugins → VimCord), in any combination:
 
-- Panels are [system24](https://github.com/refact0r/system24)'s (refact0r, MIT), loaded from its site, with lazygit-style numbered labels.
-- Colors come from **nvim's own highlight groups**: vimcord runs nvim headless with your config (about 0.4s, and only when your terminal's palette changes) and copies lualine's mode colors, CursorLine, Visual, FloatBorder and which-key's colors. Without nvim, your terminal's palette stands in.
-- The palette is read from Omarchy's current theme (`~/.config/omarchy/current/theme/colors.toml`), else Ghostty, Alacritty or Kitty's config, every few seconds, so switching Omarchy themes switches Discord's too. With no theme anywhere, it's Tokyo Night.
-- The font is your terminal's. With a Nerd Font, the bar gets powerline arrows.
-- The window's own buttons are hidden (a setting brings them back).
+- **TUI style**: [system24](https://github.com/refact0r/system24)'s (refact0r, MIT) bordered panels with lazygit-style numbered labels, in your terminal's font. Off keeps Discord's layout: the bar, popups and keys stay, and themed colors use [midnight](https://github.com/refact0r/midnight-discord), the flat theme system24 is built on.
+- **Colors**:
+  - **Your theme** (default): **nvim's own highlight groups**. vimcord runs nvim headless with your config (about 0.4s, and only when your terminal's palette changes) and copies lualine's mode colors, CursorLine, Visual, FloatBorder and which-key's colors. Without nvim, your terminal's palette stands in: Omarchy's current theme (`~/.config/omarchy/current/theme/colors.toml`), else Ghostty (following `config-file` includes), Alacritty or Kitty, re-read every few seconds so switching Omarchy themes switches Discord's too. With no theme anywhere, it's Tokyo Night.
+  - **A fixed theme**: Tokyo Night, Catppuccin Mocha, Gruvbox, Nord, Rosé Pine or Kanagawa, with their nvim colorschemes' mode and highlight colors.
+  - **Discord's own colors**.
 
-Turn the look off to keep your own theme. The keys, modes, bar and popups work either way.
+With a Nerd Font, the bar gets powerline arrows. The window's own buttons are hidden (a setting brings them back).
 
 ## Settings
 
-Look, colors file and font overrides, hiding channels/servers/header, the auto-hide width, the bar and its hints,
-scrolloff, the which-key delay, whether stray letters are ignored in NORMAL, and whether `Esc` leaves text boxes.
+TUI style, colors, colors file and font overrides, hiding channels/servers/header, the auto-hide width, the bar and
+its hints, scrolloff, the which-key delay, whether stray letters are ignored in NORMAL, whether `Esc` leaves text
+boxes, and whether Discord's own keyboard mode (Tab hopping between buttons, with focus outlines) may stay on. It's
+off by default: vimcord switches it off and Tab cycles its panes instead.
 
 ## How it works
 

@@ -135,7 +135,8 @@ export function searchKeys(prefix: string) {
         return true;
     }).map(b => ({
         label: b.desc,
-        hint: b.keys.replaceAll("<Space>", "␣ ").replace(/<C-(.)>/g, "Ctrl-$1").replaceAll("<CR>", "Enter"),
+        hint: b.keys.replaceAll("<Space>", "␣ ").replace(/<C-(.)>/g, "Ctrl-$1").replaceAll("<CR>", "Enter")
+            .replaceAll("<S-Tab>", "Shift-Tab").replaceAll("<Tab>", "Tab"),
         select: () => b.run(),
     }));
     picker.openList(prefix ? `Keys: ${prefix.replaceAll("<Space>", "␣ ").trim()}` : "Keys", items, () => { });
@@ -155,6 +156,8 @@ export const bindings: Binding[] = [
     { keys: "2", group: "Panes", desc: "Channels", run: () => panes.focus("channels") },
     { keys: "3", group: "Panes", desc: "Messages", run: () => panes.focus("messages") },
     { keys: "4", group: "Panes", desc: "Members", run: () => panes.focus("members") },
+    { keys: "<Tab>", group: "Panes", desc: "Next pane (wraps around)", run: () => panes.cycle(1) },
+    { keys: "<S-Tab>", group: "Panes", desc: "Previous pane (wraps around)", run: () => panes.cycle(-1) },
     { keys: "<C-h>", group: "Panes", desc: "Pane to the left", run: () => panes.step(-1) },
     { keys: "<C-l>", group: "Panes", desc: "Pane to the right", run: () => panes.step(1) },
     { keys: "<CR>", group: "Panes", desc: "Open (server, channel, member)", in: "lists", run: panes.open },
