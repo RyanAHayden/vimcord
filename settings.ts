@@ -8,9 +8,18 @@ import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 
 import * as cursor from "./cursor";
+import * as look from "./look";
 import * as panes from "./panes";
 
-const applyHidden = () => panes.setHidden({ servers: settings.store.hideServers, channels: settings.store.hideChannels });
+function applyHidden() {
+    panes.setHidden({ servers: settings.store.hideServers, channels: settings.store.hideChannels });
+    document.body.classList.toggle("vimcord-hide-header", settings.store.hideHeader);
+}
+
+export function applyLook() {
+    if (settings.store.look === "nvim") look.enable({ colorsFile: settings.store.colorsFile, font: settings.store.font });
+    else look.disable();
+}
 
 export function onResize() {
     const w = settings.store.autoHideWidth;
@@ -21,6 +30,27 @@ let onSettingsChange = () => { };
 export const setOnSettingsChange = (fn: () => void) => void (onSettingsChange = fn);
 
 export const settings = definePluginSettings({
+    look: {
+        type: OptionType.SELECT,
+        description: "Look: like nvim in your terminal (system24's panels in your terminal's colors and font, following Omarchy's current theme), or leave Discord's look alone",
+        options: [
+            { label: "nvim (your terminal's colors and font)", value: "nvim", default: true },
+            { label: "Off: keep Discord's / your theme's look", value: "off" },
+        ],
+        onChange: () => applyLook(),
+    },
+    colorsFile: {
+        type: OptionType.STRING,
+        description: "Colors file for the nvim look. Empty: Omarchy's current theme, else your Ghostty, Alacritty or Kitty config. Or a path to a colors.toml, alacritty.toml, ghostty or kitty config",
+        default: "",
+        onChange: () => applyLook(),
+    },
+    font: {
+        type: OptionType.STRING,
+        description: "Font for the nvim look. Empty: your terminal's",
+        default: "",
+        onChange: () => applyLook(),
+    },
     hideChannels: {
         type: OptionType.BOOLEAN,
         description: "Hide the channel list (Space e). Pressing 2 shows it while it's focused",
@@ -29,8 +59,14 @@ export const settings = definePluginSettings({
     },
     hideServers: {
         type: OptionType.BOOLEAN,
-        description: "Hide the server list (Space s). Pressing 1 shows it while it's focused",
+        description: "Hide the server list (Space u s). Pressing 1 shows it while it's focused",
         default: false,
+        onChange: applyHidden,
+    },
+    hideHeader: {
+        type: OptionType.BOOLEAN,
+        description: "Hide the channel header (name, pins, members, search) above the chat (Space u h). It shows while its search is in use",
+        default: true,
         onChange: applyHidden,
     },
     autoHideWidth: {
@@ -69,7 +105,7 @@ export const settings = definePluginSettings({
     },
     escapeLeavesInput: {
         type: OptionType.BOOLEAN,
-        description: "Esc in the message box leaves it (keeping the draft) when Discord has nothing else to do with it, like closing a reply",
+        description: "Esc in the message box goes to normal mode, keeping the draft and any reply (open suggestions and popups still close first)",
         default: true,
     },
 });

@@ -36,6 +36,7 @@ export function showWhichKey(pending: string) {
         grid.append(row);
     }
     whichKey.append(grid);
+    whichKey.append(el("div", "vimcord-whichkey-foot", "/ search"));
 }
 
 export function hideWhichKey() {
@@ -50,7 +51,7 @@ export function toggleHelp() {
     help = document.body.appendChild(el("div", "vimcord-help"));
     const sheet = help.appendChild(el("fieldset", "vimcord-float vimcord-help-sheet"));
     sheet.append(el("legend", "", " vimcord "));
-    sheet.append(el("p", "vimcord-help-sub", "1-4 focus a pane; j/k and friends move in the focused one. Esc goes back to the messages, then clears the cursor, then marks the channel read like normal. In a text box Esc leaves it, and Ctrl-n/p or Ctrl-j/k move through suggestions and the quick switcher."));
+    sheet.append(el("p", "vimcord-help-sub", "1-4 focus a pane; j/k and friends move in the focused one. v starts selecting messages: move to extend, then y copies or d deletes them. Esc always means normal mode: in a text box it leaves it (keeping the draft); in normal mode each press backs out of one thing (keys typed, visual mode, a list pane, a reply), then marks the channel read. In a text box, Ctrl-n/p or Ctrl-j/k move through suggestions."));
 
     const groups = new Map<string, typeof bindings>();
     for (const b of bindings) groups.set(b.group, [...(groups.get(b.group) ?? []), b]);

@@ -10,7 +10,7 @@
 import { Channel } from "@vencord/discord-types";
 import { ChannelRouter, ChannelStore, GuildChannelStore, GuildStore, NavigationRouter, ReadStateStore, SelectedGuildStore, SortedGuildStore, UserStore } from "@webpack/common";
 
-interface Item {
+export interface Item {
     label: string;
     hint?: string;
     unread?: boolean;
@@ -105,7 +105,7 @@ function render() {
     const q = input.value.trim().replace(/\s+/g, "");
     matches = new Map();
     if (q) {
-        const scored = items.map(it => [it, match(it.label, q)] as const).filter(([, m]) => m) as [Item, { score: number; at: number[]; }][];
+        const scored = items.map(it => [it, match(it.label, q) ?? (it.hint && match(it.hint.replace(/\s/g, ""), q) ? { score: 0, at: [] } : null)] as const).filter(([, m]) => m) as [Item, { score: number; at: number[]; }][];
         scored.sort((a, b) => b[1].score - a[1].score);
         shown = scored.map(([it, m]) => (matches.set(it, m.at), it));
     } else shown = items;
@@ -130,15 +130,20 @@ function render() {
 }
 
 export function open(kind: "channels" | "servers", then: () => void) {
+    const guildId = SelectedGuildStore.getGuildId();
+    const title = kind === "servers" ? "Servers" : !guildId ? "Direct Messages" : `Channels in ${GuildStore.getGuild(guildId)?.name ?? "Favorites"}`;
+    openList(title, kind === "channels" ? channelItems() : serverItems(), then);
+}
+
+/** a picker over any list: what to show and what picking each does */
+export function openList(title: string, list_: Item[], then: () => void) {
     close();
-    items = kind === "channels" ? channelItems() : serverItems();
+    items = list_;
     afterSelect = then;
     sel = 0;
     root = document.body.appendChild(Object.assign(document.createElement("div"), { className: "vimcord-picker" }));
     // a fieldset, so the title sits in the top border like nvim's floating windows
     const box = root.appendChild(Object.assign(document.createElement("fieldset"), { className: "vimcord-float vimcord-picker-box" }));
-    const guildId = SelectedGuildStore.getGuildId();
-    const title = kind === "servers" ? "Servers" : !guildId ? "Direct Messages" : `Channels in ${GuildStore.getGuild(guildId)?.name ?? "Favorites"}`;
     box.append(Object.assign(document.createElement("legend"), { textContent: ` ${title} ` }));
     const prompt = box.appendChild(Object.assign(document.createElement("div"), { className: "vimcord-picker-prompt" }));
     prompt.append(Object.assign(document.createElement("span"), { className: "vimcord-picker-icon", textContent: "❯" }));

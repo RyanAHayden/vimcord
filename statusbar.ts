@@ -7,8 +7,10 @@
 // The bottom bar, lualine style: the mode, the focused pane, where you are, keys typed so far, and hints for what
 // you can press here. It sits under Discord, which shrinks to make room.
 
-import { ChannelStore, GuildStore, SelectedChannelStore } from "@webpack/common";
+import { ChannelStore, GuildStore, MediaEngineStore, RTCConnectionStore, SelectedChannelStore } from "@webpack/common";
 
+import { selected } from "./cursor";
+import { isStreaming } from "./discord";
 import { Mode } from "./mode";
 import { PaneId } from "./panes";
 
@@ -18,6 +20,7 @@ let last = "";
 const HINTS: Record<string, string[][]> = {
     messages: [["j/k", "move"], ["r", "reply"], ["e", "edit"], ["+", "react"], ["i", "type"], ["1-4", "panes"], ["␣", "leader"], ["?", "help"]],
     list: [["j/k", "move"], ["⏎", "open"], ["esc", "back"], ["1-4", "panes"], ["?", "help"]],
+    VISUAL: [["j/k", "extend"], ["y", "copy"], ["d", "delete"], ["o", "other end"], ["esc", "cancel"]],
     INSERT: [["esc", "normal"], ["⏎", "send"], ["^n/^p", "suggestions"]],
     POPUP: [["esc", "close"], ["keys go to Discord", ""]],
 };
@@ -30,9 +33,24 @@ function where() {
     return guild ? `${guild} › #${name}` : `@${ch.rawRecipients?.map((r: any) => r.global_name ?? r.username).join(", ") || name}`;
 }
 
+/** voice state: the channel you're in, and muted / deafened / live / cam. Muted and deafened show even when not in a call,
+ * since they carry into the next one. */
+function voice(): [string, string][] {
+    const out: [string, string][] = [];
+    const id = RTCConnectionStore.isConnected() ? RTCConnectionStore.getChannelId() : null;
+    if (id) out.push(["vimcord-bar-voice", "🔊 " + (ChannelStore.getChannel(id)?.name ?? "voice")]);
+    if (MediaEngineStore.isSelfDeaf()) out.push(["vimcord-bar-off", "deafened"]);
+    else if (MediaEngineStore.isSelfMute()) out.push(["vimcord-bar-off", "muted"]);
+    if (id && isStreaming()) out.push(["vimcord-bar-live", "live"]);
+    if (id && MediaEngineStore.isVideoEnabled()) out.push(["vimcord-bar-live", "cam"]);
+    return out;
+}
+
 export function render(m: Mode, pane: PaneId, pending: string, hints: boolean) {
     const ctx = m === "NORMAL" ? pane === "messages" ? "messages" : "list" : m;
-    const key = [m, pane, pending, hints, where()].join("|");
+    if (m === "VISUAL") pending ||= `${selected().length} selected`;
+    const v = voice();
+    const key = [m, pane, pending, hints, where(), v.join()].join("|");
     if (key === last && bar) return;
     last = key;
 
@@ -42,10 +60,11 @@ export function render(m: Mode, pane: PaneId, pending: string, hints: boolean) {
     const span = (cls: string, text: string) => bar!.appendChild(Object.assign(document.createElement("span"), { className: cls, textContent: text }));
 
     span("vimcord-bar-mode", m);
-    if (m === "NORMAL") span("vimcord-bar-pane", pane);
+    if (m === "NORMAL" || m === "VISUAL") span("vimcord-bar-pane", pane);
     span("vimcord-bar-where", where());
     span("vimcord-bar-fill", "");
     if (pending) span("vimcord-bar-pending", pending.replaceAll("<Space>", "␣"));
+    for (const [cls, text] of v) span(cls, text);
     if (hints) {
         const h = span("vimcord-bar-hints", "");
         for (const [k, d] of HINTS[ctx]) {

@@ -9,13 +9,16 @@
 // so it survives re-renders, new messages and older messages loading in above it.
 
 import { Message } from "@vencord/discord-types";
-import { MessageActions, SelectedChannelStore } from "@webpack/common";
+import { MessageActions, MessageStore, SelectedChannelStore } from "@webpack/common";
 
 import { getMessage, hasMoreAfter, scrollToPresent } from "./discord";
 
 const ATTR = "data-vimcord-cursor";
+const VISUAL = "data-vimcord-visual";
 
 let cursorId: string | null = null;
+// visual mode: the other end of the selection (the cursor is the moving end)
+let anchorId: string | null = null;
 let observed: Element | null = null;
 const observer = new MutationObserver(() => paint());
 
@@ -48,6 +51,11 @@ function paint() {
     }
     for (const el of document.querySelectorAll(`[${ATTR}]`))
         if (idOf(el) !== cursorId) el.removeAttribute(ATTR);
+    const sel = new Set(anchorId ? selected().map(m => m.id) : []);
+    for (const el of document.querySelectorAll(`[${VISUAL}]`))
+        if (!sel.has(idOf(el))) el.removeAttribute(VISUAL);
+    for (const el of items())
+        if (sel.has(idOf(el)) && !el.hasAttribute(VISUAL)) el.setAttribute(VISUAL, "");
     if (!cursorId) return;
     const el = elOf(cursorId);
     if (el) {
@@ -55,6 +63,7 @@ function paint() {
     } else if (l && !document.getElementById(`chat-messages-${SelectedChannelStore.getChannelId()}-${cursorId}`)) {
         // the message went away (deleted, or the channel changed under us): drop the cursor rather than guess
         cursorId = null;
+        anchorId = null;
     }
 }
 
@@ -62,6 +71,7 @@ export const active = () => cursorId != null && elOf(cursorId) != null;
 
 export function clear() {
     cursorId = null;
+    anchorId = null;
     paint();
     observer.disconnect();
     observed = null;
@@ -69,6 +79,38 @@ export function clear() {
 
 export function current(): Message | undefined {
     return cursorId && active() ? getMessage(cursorId) : undefined;
+}
+
+export const visual = () => anchorId != null;
+
+/** v: start selecting from the message under the cursor */
+export function startVisual() {
+    if (!active()) move(0);
+    anchorId = cursorId;
+    paint();
+}
+
+export function endVisual() {
+    anchorId = null;
+    paint();
+}
+
+/** o in visual mode: jump to the other end of the selection */
+export function swapEnds() {
+    if (!anchorId || !cursorId) return;
+    [anchorId, cursorId] = [cursorId, anchorId];
+    paint();
+    const el = elOf(cursorId);
+    if (el) scrollTo(el, "nearest");
+}
+
+/** the selected messages, oldest first, from Discord's store so a selection scrolled partly off screen still counts */
+export function selected(): Message[] {
+    if (!anchorId || !cursorId) return [];
+    const all: Message[] = (MessageStore.getMessages(SelectedChannelStore.getChannelId()) as any)?._array ?? [];
+    const a = all.findIndex(m => m.id === anchorId), b = all.findIndex(m => m.id === cursorId);
+    if (a < 0 || b < 0) return [];
+    return all.slice(Math.min(a, b), Math.max(a, b) + 1).filter(m => !m.deleted);
 }
 
 function viewport() {

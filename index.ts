@@ -5,16 +5,17 @@
  */
 
 import definePlugin from "@utils/types";
-import { PendingReplyStore, SelectedChannelStore } from "@webpack/common";
+import { FluxDispatcher, PendingReplyStore, SelectedChannelStore } from "@webpack/common";
 
 import * as cursor from "./cursor";
-import { logger } from "./discord";
+import { keybind, logger } from "./discord";
 import { closeHelp, helpOpen, hideWhichKey, scrollHelp, showWhichKey, toggleHelp } from "./hud";
-import { byKeys, isPrefix } from "./keymap";
+import { byKeys, deleteSelection, isPrefix, searchKeys, yankSelection } from "./keymap";
+import * as look from "./look";
 import { isEditable, mode, somethingOpen } from "./mode";
 import * as panes from "./panes";
 import * as picker from "./picker";
-import { applyHidden, onResize, setOnSettingsChange, settings } from "./settings";
+import { applyHidden, applyLook, onResize, setOnSettingsChange, settings } from "./settings";
 import * as statusbar from "./statusbar";
 import managedStyle from "./style.css?managed";
 
@@ -39,8 +40,9 @@ function update() {
     const m = mode();
     const c = document.body.classList;
     c.toggle("vimcord-insert", m === "INSERT");
+    c.toggle("vimcord-visual", m === "VISUAL");
     c.toggle("vimcord-has-bar", settings.store.statusBar);
-    if (m === "NORMAL" && panes.current() === "messages") cursor.place();
+    if ((m === "NORMAL" || m === "VISUAL") && panes.current() === "messages") cursor.place();
     if (settings.store.statusBar) statusbar.render(m, panes.current(), pending, settings.store.statusBarHints);
     else statusbar.remove();
 }
@@ -102,6 +104,10 @@ function handleKey(e: KeyboardEvent) {
         consume(e);
         const k = keyName(e);
         if (k === "<Esc>" || k === "?" || k === "q") closeHelp();
+        else if (k === "/") {
+            closeHelp();
+            searchKeys("");
+        }
         else if (k === "j" || k === "<C-e>") scrollHelp(40);
         else if (k === "k" || k === "<C-y>") scrollHelp(-40);
         else if (k === "<C-d>" || k === "<C-f>") scrollHelp(300);
@@ -116,16 +122,24 @@ function handleKey(e: KeyboardEvent) {
     const key = keyName(e);
     if (key == null) return;
 
+    // Esc always stays in normal mode (Discord's would jump to the message box from a focused message). Each press
+    // backs out of one thing: keys typed so far, visual mode, a list pane, a pending reply, then marks the channel read
     if (key === "<Esc>") {
-        if (pending) {
-            reset();
-            consume(e);
-        } else if (panes.current() !== "messages") {
-            panes.focus("messages");
-            consume(e);
-        }
-        // otherwise Discord's Esc: mark the channel read
+        consume(e);
+        const channelId = SelectedChannelStore.getChannelId();
+        if (pending) reset();
+        else if (cursor.visual()) cursor.endVisual();
+        else if (panes.current() !== "messages") panes.focus("messages");
+        else if (PendingReplyStore.getPendingReply(channelId)) FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId });
+        else keybind("MARK_CHANNEL_READ", "esc");
         return;
+    }
+
+    if (cursor.visual() && !pending) {
+        if (key === "y") return consume(e), yankSelection();
+        if (key === "d") return consume(e), deleteSelection();
+        if (key === "o") return consume(e), cursor.swapEnds();
+        if (key === "v" || key === "V") return consume(e), cursor.endVisual();
     }
 
     // in the messages pane, Enter on a focused button or link (Tab navigation) is Discord's: it clicks it
@@ -134,6 +148,14 @@ function handleKey(e: KeyboardEvent) {
     if (!pending && key === "?") {
         consume(e);
         return toggleHelp();
+    }
+
+    // / after a prefix searches what can follow it, like which-key's popup but by name
+    if (pending && key === "/") {
+        consume(e);
+        const prefix = pending;
+        reset();
+        return searchKeys(prefix);
     }
 
     const seq = pending + key;
@@ -151,6 +173,8 @@ function handleKey(e: KeyboardEvent) {
         consume(e);
         const inMessages = panes.current() === "messages";
         if (binding.in === "messages" && !inMessages || binding.in === "lists" && inMessages) return;
+        // visual mode only moves; acting on the selection is y and d
+        if (cursor.visual() && binding.group !== "Moving") return;
         // bindings meant to start typing (i, a, r) keep the focus they give the message box
         keepNormalUntil = binding.insert ? 0 : Date.now() + 1500;
         try {
@@ -166,18 +190,20 @@ function handleKey(e: KeyboardEvent) {
 
 const suggestionsOpen = (target: HTMLElement) => !!document.querySelector('[role="listbox"]') || !!target.getAttribute("aria-activedescendant");
 
-// Esc in the message box leaves it, keeping the draft, unless Discord has a use for it first: closing suggestions or a
-// popup, or cancelling a reply. (Discord marks every Esc there as handled, so this can't wait to see what it did.)
+// Esc in a text box goes to normal mode, keeping the draft and any reply (a second Esc cancels that). Only open
+// suggestions or a popup get it first, so Esc closes those. A message being edited keeps Discord's Esc: cancel the edit.
 function leavesInput(target: HTMLElement) {
     if (!settings.store.escapeLeavesInput) return false;
-    if (!isComposer(target)) return false;
-    return !suggestionsOpen(target) && !somethingOpen() && !PendingReplyStore.getPendingReply(SelectedChannelStore.getChannelId());
+    if (target.closest('li[id^="chat-messages-"]')) return false;
+    return !suggestionsOpen(target) && !somethingOpen();
 }
 
 // in a text box: Esc back to normal mode, and Ctrl-n/p or Ctrl-j/k through the suggestions (mentions, emoji,
 // commands, quick switcher)
 function onInsertKey(e: KeyboardEvent, target: HTMLElement) {
     reset();
+    // cancelling an edit is Discord's, but it then focuses the message box: stay in normal mode instead
+    if (e.key === "Escape" && target.closest('li[id^="chat-messages-"]')) keepNormalUntil = Date.now() + 800;
     if (e.key === "Escape" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && leavesInput(target)) {
         consume(e);
         target.blur();
@@ -218,6 +244,7 @@ export default definePlugin({
 
     start() {
         cursor.setScrollOff(settings.store.scrollOff);
+        applyLook();
         panes.setOnChange(schedule);
         setOnSettingsChange(schedule);
         applyHidden();
@@ -247,7 +274,8 @@ export default definePlugin({
         cursor.clear();
         panes.clear();
         statusbar.remove();
-        document.body.classList.remove("vimcord-insert", "vimcord-has-bar");
+        look.disable();
+        document.body.classList.remove("vimcord-insert", "vimcord-visual", "vimcord-has-bar");
     },
 
     flux: {

@@ -9,8 +9,8 @@
 
 import { Logger } from "@utils/Logger";
 import { Channel, Message } from "@vencord/discord-types";
-import { filters, findByCodeLazy, findLazy, findStoreLazy, mapMangledModuleLazy } from "@webpack";
-import { ChannelStore, ComponentDispatch, MessageStore, SelectedChannelStore, showToast } from "@webpack/common";
+import { filters, findByCodeLazy, findByPropsLazy, findLazy, findStoreLazy, mapMangledModuleLazy } from "@webpack";
+import { ChannelStore, ComponentDispatch, MediaEngineStore, MessageStore, SelectedChannelStore, showToast } from "@webpack/common";
 
 export const logger = new Logger("VimCord");
 
@@ -33,6 +33,11 @@ const MessageShortcuts: Record<"reply" | "edit" | "delete" | "pin" | "forward" |
     });
 
 const markUnreadFn: (channelId: string, messageId: string) => Promise<void> = findByCodeLazy("Marking unread");
+
+const VoiceActions: { disconnect(): void; } = findByPropsLazy("selectVoiceChannel", "disconnect");
+const MediaActions: { setVideoEnabled(on: boolean): void; } = findByPropsLazy("toggleSelfMute", "setVideoEnabled");
+const ApplicationStreamingStore = findStoreLazy("ApplicationStreamingStore") as { getCurrentUserActiveStream(): unknown; };
+const stopOwnStream: () => void = findByCodeLazy("getCurrentUserActiveStream();null!=");
 
 export const LayerStore = findStoreLazy("LayerStore") as { hasLayers(): boolean; };
 
@@ -99,4 +104,37 @@ export function getMessage(messageId: string, channelId = SelectedChannelStore.g
 
 export function hasMoreAfter(channelId = SelectedChannelStore.getChannelId()) {
     return !!(MessageStore.getMessages(channelId) as any)?.hasMoreAfter;
+}
+
+// voice: mute and deafen are Discord's keybind actions; the rest its voice/media functions
+
+export const isStreaming = () => ApplicationStreamingStore.getCurrentUserActiveStream() != null;
+
+export function toggleStream() {
+    try {
+        if (isStreaming()) return stopOwnStream();
+        // starting one goes through Discord's own picker (screen, window, game), behind its button in the voice panel
+        const button = [...document.querySelectorAll<HTMLElement>('[class*="panels_"] button')]
+            .find(b => /share your screen|go live|stream/i.test(b.getAttribute("aria-label") ?? ""));
+        if (button) button.click();
+        else toast("join a voice channel to stream");
+    } catch (e) {
+        unavailable("streaming", e);
+    }
+}
+
+export function toggleCamera() {
+    try {
+        MediaActions.setVideoEnabled(!MediaEngineStore.isVideoEnabled());
+    } catch (e) {
+        unavailable("camera", e);
+    }
+}
+
+export function disconnectVoice() {
+    try {
+        VoiceActions.disconnect();
+    } catch (e) {
+        unavailable("disconnect", e);
+    }
 }

@@ -1,38 +1,113 @@
-/* the message under the cursor: an accent bar on the left and the hover background, so it reads in any theme */
+/* vimcord's colors. Without the nvim look they follow Discord's (or your theme's) variables; the look (look.ts)
+   sets them from your terminal's palette. */
+:root {
+    --vc-font: var(--font-code, monospace);
+    --vc-bg: var(--background-base-lowest, var(--background-tertiary, #111214));
+    --vc-fg: var(--text-default, var(--text-normal, #dbdee1));
+    --vc-strong: var(--text-strong, var(--header-primary, #fff));
+    --vc-muted: var(--text-muted, #949ba4);
+    --vc-accent: var(--text-brand, var(--brand-500, #5865f2));
+    --vc-border: var(--border-normal, rgb(128 128 128 / 25%));
+    --vc-float-border: var(--vc-accent);
+    --vc-cursorline: var(--background-mod-subtle, rgb(128 128 128 / 10%));
+    --vc-sel: var(--background-mod-strong, rgb(128 128 128 / 30%));
+    --vc-sel-fg: var(--vc-strong);
+    --vc-normal: var(--vc-accent);
+    --vc-insert: var(--text-feedback-positive, var(--status-positive, #23a55a));
+    --vc-visual: #a855f7;
+    --vc-popup: var(--text-feedback-warning, var(--status-warning, #f0b232));
+    --vc-match: var(--text-link, #00a8fc);
+    --vc-num: var(--vc-popup);
+    --vc-section: var(--background-mod-subtle, rgb(128 128 128 / 15%));
+}
+
+/* the message cursor, like nvim's cursorline: a line highlight with a bar in the mode's color */
 [data-vimcord-cursor] {
-    background: var(--background-mod-subtle, var(--background-message-hover, rgb(128 128 128 / 10%))) !important;
-    box-shadow: inset 3px 0 0 var(--text-brand, var(--brand-500, #5865f2));
+    background: var(--vc-cursorline) !important;
+    box-shadow: inset 3px 0 0 var(--vc-normal);
 }
 
-.vimcord-whichkey,
-.vimcord-help-sheet {
-    font-family: var(--font-code, monospace);
-    color: var(--text-default, var(--text-normal, #dbdee1));
-    background: var(--background-surface-high, var(--background-floating, #111214));
-    border: 1px solid var(--border-normal, rgb(128 128 128 / 25%));
+/* faint while typing or in another pane, so it's clear the keys aren't going to it */
+.vimcord-insert [data-vimcord-cursor],
+.vimcord-list-focused [data-vimcord-cursor] {
+    background: transparent !important;
+    box-shadow: inset 3px 0 0 var(--vc-border);
+}
+
+/* visual mode: the selection, like nvim's Visual highlight */
+[data-vimcord-visual] {
+    background: color-mix(in oklab, var(--vc-sel) 70%, transparent) !important;
+    box-shadow: inset 3px 0 0 var(--vc-visual);
+}
+
+.vimcord-visual [data-vimcord-cursor] {
+    background: var(--vc-sel) !important;
+    box-shadow: inset 3px 0 0 var(--vc-visual);
+}
+
+/* the highlighted item in a focused server/channel/member list, and the focused pane */
+[data-vimcord-item] {
+    border-radius: 0;
+    outline: 1px solid var(--vc-normal) !important;
+    outline-offset: -1px;
+    background: var(--vc-cursorline) !important;
+}
+
+[data-vimcord-pane] {
+    outline: 1px solid var(--vc-normal);
+    outline-offset: -1px;
+}
+
+/* hidden panes (Space e / s / m, zoom, narrow window) */
+.vimcord-hide-channels [class*="sidebarList_"],
+.vimcord-hide-channels [class*="sidebar_"] > [class*="panels_"],
+.vimcord-hide-servers [class*="sidebar_"] > nav:has([data-list-id="guildsnav"]),
+.vimcord-hide-members [class*="membersWrap_"],
+.vimcord-zoom [class*="subtitleContainer_"] {
+    display: none !important;
+}
+
+/* floating windows (picker, which-key, help) like nvim's: a rounded border with the title set into it */
+.vimcord-float {
+    margin: 0;
+    min-width: 0;
+    font-family: var(--vc-font);
+    color: var(--vc-fg);
+    background: var(--vc-bg);
+    border: 1px solid var(--vc-float-border);
     border-radius: 8px;
-    box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
 }
 
+.vimcord-float > legend {
+    margin: 0 auto;
+    padding: 0 4px;
+    font-size: 13px;
+    color: var(--vc-strong);
+}
+
+.vimcord-float kbd {
+    font-family: inherit;
+    font-weight: 700;
+    color: var(--vc-strong);
+}
+
+/* which-key */
 .vimcord-whichkey {
     position: fixed;
-    right: 24px;
-    bottom: 96px;
+    right: 16px;
+    bottom: 40px;
     z-index: 10000;
-    max-width: min(560px, calc(100vw - 48px));
-    padding: 10px 12px;
+    max-width: min(640px, calc(100vw - 32px));
+    padding: 4px 12px 8px;
     font-size: 13px;
     pointer-events: none;
 }
 
-.vimcord-group {
-    color: var(--text-brand, var(--brand-500, #5865f2));
-}
-
 .vimcord-whichkey-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 4px 16px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 2px 20px;
 }
 
 .vimcord-whichkey-row,
@@ -42,17 +117,16 @@
     align-items: baseline;
 }
 
-.vimcord-whichkey kbd,
-.vimcord-help kbd {
-    font-family: inherit;
-    font-weight: 600;
-    color: var(--text-strong, var(--header-primary, #fff));
-}
-
 .vimcord-whichkey-row kbd {
     min-width: 2ch;
+    color: var(--vc-match);
 }
 
+.vimcord-group {
+    color: var(--vc-visual);
+}
+
+/* ? help */
 .vimcord-help {
     position: fixed;
     inset: 0;
@@ -64,22 +138,23 @@
 }
 
 .vimcord-help-sheet {
-    width: min(960px, 100%);
+    width: min(980px, 100%);
     max-height: calc(100vh - 32px);
     overflow-y: auto;
-    padding: 20px 24px;
+    padding: 8px 20px 16px;
     font-size: 13px;
 }
 
 .vimcord-help h3 {
-    margin: 0 0 8px;
-    color: var(--text-brand, var(--brand-500, #5865f2));
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: var(--vc-normal);
 }
 
 .vimcord-help-sub {
     margin: 0 0 16px;
-    color: var(--text-muted, #949ba4);
-    line-height: 1.4;
+    line-height: 1.5;
+    color: var(--vc-muted);
 }
 
 .vimcord-help-sub:last-child {
@@ -87,7 +162,7 @@
 }
 
 .vimcord-help-cols {
-    columns: 260px;
+    columns: 280px;
     column-gap: 32px;
 }
 
@@ -97,135 +172,18 @@
 }
 
 .vimcord-help-row {
-    padding: 2px 0;
+    padding: 1px 0;
 }
 
 .vimcord-help-keys {
-    flex: 0 0 11ch;
+    flex: 0 0 13ch;
 }
 
-/* the highlighted item in a focused server/channel/member list, and the focused pane itself */
-[data-vimcord-item] {
-    border-radius: 4px;
-    outline: 2px solid var(--text-brand, var(--brand-500, #5865f2)) !important;
-    outline-offset: -2px;
+.vimcord-help-keys kbd {
+    color: var(--vc-match);
 }
 
-[data-vimcord-pane] {
-    outline: 1px solid var(--text-brand, var(--brand-500, #5865f2));
-    outline-offset: -1px;
-}
-
-/* hidden panes (Space e / Space s / Space z) */
-.vimcord-hide-channels [class*="sidebarList_"],
-.vimcord-hide-servers [class*="sidebar_"] > nav:has([data-list-id="guildsnav"]) {
-    display: none !important;
-}
-
-.vimcord-hide-channels [class*="sidebar_"] > [class*="panels_"],
-.vimcord-hide-members [class*="membersWrap_"],
-.vimcord-zoom [class*="subtitleContainer_"] {
-    display: none !important;
-}
-
-/* the message cursor is solid in normal mode on the messages, faint while typing or in another pane */
-.vimcord-insert [data-vimcord-cursor],
-.vimcord-list-focused [data-vimcord-cursor] {
-    box-shadow: inset 3px 0 0 var(--border-normal, rgb(128 128 128 / 40%));
-    background: transparent !important;
-}
-
-/* the bottom bar: Discord shrinks to leave it room */
-.vimcord-has-bar #app-mount {
-    height: calc(100% - 24px) !important;
-}
-
-.vimcord-bar {
-    position: fixed;
-    inset: auto 0 0;
-    z-index: 10001;
-    display: flex;
-    align-items: stretch;
-    height: 24px;
-    overflow: hidden;
-    font-family: var(--font-code, monospace);
-    font-size: 12px;
-    line-height: 24px;
-    white-space: nowrap;
-    color: var(--text-muted, #949ba4);
-    background: var(--background-surface-high, var(--background-floating, #111214));
-    border-top: 1px solid var(--border-normal, rgb(128 128 128 / 25%));
-}
-
-.vimcord-bar > span {
-    padding: 0 10px;
-}
-
-.vimcord-bar-mode {
-    font-weight: 700;
-    color: var(--background-base-lowest, #000);
-    background: var(--text-brand, var(--brand-500, #5865f2));
-}
-
-.vimcord-bar[data-mode="insert"] .vimcord-bar-mode {
-    background: var(--text-feedback-positive, var(--status-positive, #23a55a));
-}
-
-.vimcord-bar[data-mode="popup"] .vimcord-bar-mode {
-    background: var(--text-feedback-warning, var(--status-warning, #f0b232));
-}
-
-.vimcord-bar-pane {
-    color: var(--text-default, var(--text-normal, #dbdee1));
-    background: var(--background-mod-subtle, rgb(128 128 128 / 15%));
-}
-
-.vimcord-bar-where {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-}
-
-.vimcord-bar-fill {
-    flex: 1;
-    padding: 0 !important;
-}
-
-.vimcord-bar-pending {
-    font-weight: 700;
-    color: var(--text-strong, var(--header-primary, #fff));
-}
-
-.vimcord-bar-hints {
-    display: flex;
-    gap: 12px;
-    overflow: hidden;
-}
-
-.vimcord-bar-hints b {
-    color: var(--text-default, var(--text-normal, #dbdee1));
-}
-
-/* floating windows (picker, which-key, help) look like nvim's: a rounded border with the title set into it */
-.vimcord-float {
-    margin: 0;
-    min-width: 0;
-    font-family: var(--font-code, monospace);
-    color: var(--text-default, var(--text-normal, #dbdee1));
-    background: var(--background-base-lowest, var(--background-tertiary, #000));
-    border: 1px solid var(--text-brand, var(--brand-500, #5865f2));
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
-}
-
-.vimcord-float > legend {
-    margin: 0 auto;
-    padding: 0 4px;
-    font-size: 13px;
-    color: var(--text-strong, var(--header-primary, #fff));
-}
-
-/* / in the channels or servers pane */
+/* / picker, after nvim's snacks picker */
 .vimcord-picker {
     position: fixed;
     inset: 0;
@@ -250,11 +208,11 @@
     align-items: center;
     gap: 8px;
     padding: 2px 10px 6px;
-    border-bottom: 1px solid var(--text-brand, var(--brand-500, #5865f2));
+    border-bottom: 1px solid var(--vc-float-border);
 }
 
 .vimcord-picker-icon {
-    color: var(--text-link, #00a8fc);
+    color: var(--vc-match);
 }
 
 .vimcord-picker-input {
@@ -266,12 +224,12 @@
     background: none;
     border: none;
     outline: none;
-    caret-color: var(--text-strong, #fff);
+    caret-color: var(--vc-strong);
 }
 
 .vimcord-picker-count {
     font-size: 13px;
-    color: var(--text-muted, #949ba4);
+    color: var(--vc-muted);
 }
 
 .vimcord-picker-list {
@@ -291,23 +249,23 @@
 }
 
 .vimcord-picker-row[data-selected] {
-    background: var(--background-mod-strong, rgb(128 128 128 / 25%));
-    color: var(--text-strong, var(--header-primary, #fff));
+    background: var(--vc-cursorline);
+    color: var(--vc-strong);
 }
 
 .vimcord-picker-row[data-unread] {
     font-weight: 700;
-    color: var(--text-strong, var(--header-primary, #fff));
+    color: var(--vc-strong);
 }
 
 .vimcord-picker-num {
     min-width: 3ch;
-    color: var(--text-feedback-warning, var(--status-warning, #f0b232));
+    color: var(--vc-num);
 }
 
 .vimcord-picker-row mark {
     background: none;
-    color: var(--text-link, #00a8fc);
+    color: var(--vc-match);
     font-weight: 700;
 }
 
@@ -315,12 +273,133 @@
     margin-left: auto;
     padding-left: 12px;
     font-size: 12px;
-    color: var(--text-muted, #949ba4);
+    color: var(--vc-muted);
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .vimcord-picker-empty {
     padding: 0 10px;
-    color: var(--text-muted, #949ba4);
+    color: var(--vc-muted);
 }
+
+/* the bottom bar, like lualine: mode block in the mode's color, then the pane, then where you are */
+.vimcord-has-bar #app-mount {
+    height: calc(100% - 22px) !important;
+}
+
+.vimcord-bar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 10001;
+    display: flex;
+    align-items: stretch;
+    height: 22px;
+    overflow: hidden;
+    font-family: var(--vc-font);
+    font-size: 12px;
+    line-height: 22px;
+    white-space: nowrap;
+    color: var(--vc-muted);
+    background: var(--vc-bg);
+}
+
+.vimcord-bar > span {
+    padding: 0 10px;
+}
+
+.vimcord-bar-mode {
+    --vc-mode: var(--vc-normal);
+    font-weight: 700;
+    color: var(--vc-bg);
+    background: var(--vc-mode);
+}
+
+.vimcord-bar[data-mode="insert"] .vimcord-bar-mode { --vc-mode: var(--vc-insert); }
+.vimcord-bar[data-mode="visual"] .vimcord-bar-mode { --vc-mode: var(--vc-visual); }
+.vimcord-bar[data-mode="popup"] .vimcord-bar-mode { --vc-mode: var(--vc-popup); }
+
+.vimcord-bar-pane {
+    color: var(--vc-fg);
+    background: var(--vc-section);
+}
+
+.vimcord-bar-where {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vimcord-bar-fill {
+    flex: 1;
+    padding: 0 !important;
+}
+
+.vimcord-bar-pending {
+    font-weight: 700;
+    color: var(--vc-strong);
+}
+
+.vimcord-bar-hints {
+    display: flex;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.vimcord-bar-hints b {
+    font-weight: 400;
+    color: var(--vc-fg);
+}
+
+/* with a Nerd Font, lualine's powerline arrows between the sections */
+.vimcord-nerd .vimcord-bar-mode,
+.vimcord-nerd .vimcord-bar-pane {
+    position: relative;
+    margin-right: 10px;
+}
+
+.vimcord-nerd .vimcord-bar-mode::after,
+.vimcord-nerd .vimcord-bar-pane::after {
+    content: "\e0b0";
+    position: absolute;
+    right: -10px;
+    width: 10px;
+    color: var(--vc-mode, var(--vc-section));
+    background: var(--vc-section);
+    line-height: 22px;
+}
+
+.vimcord-nerd .vimcord-bar-pane::after {
+    color: var(--vc-section);
+    background: var(--vc-bg);
+}
+
+/* the mode bar's color on the panes too, as nvim shows which window has focus */
+.vimcord-look.vimcord-insert [class*="channelTextArea"]:focus-within {
+    outline: 1px solid var(--vc-insert);
+    outline-offset: -1px;
+}
+
+.vimcord-nerd .vimcord-bar:is([data-mode="insert"], [data-mode="popup"]) .vimcord-bar-mode::after {
+    background: var(--vc-bg);
+}
+
+/* the channel header, hidden but still there (so its search can take focus and show it while in use) */
+.vimcord-hide-header [class*="subtitleContainer_"]:not(:focus-within):not(:has([class*="searchBar_"] [class*="focused"])) {
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
+}
+
+.vimcord-whichkey-foot {
+    margin-top: 4px;
+    text-align: right;
+    color: var(--vc-muted);
+}
+
+.vimcord-bar-voice { color: var(--vc-insert); }
+.vimcord-bar-off { color: var(--vc-bg); background: var(--red-2, #ef4444); font-weight: 700; }
+.vimcord-bar-live { color: var(--vc-bg); background: var(--vc-insert); font-weight: 700; }

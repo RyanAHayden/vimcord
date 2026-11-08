@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { visual } from "./cursor";
 import { LayerStore } from "./discord";
 
-/** NORMAL: vimcord has the keyboard. INSERT: typing in a text box. POPUP: a modal, menu or settings has it. */
-export type Mode = "NORMAL" | "INSERT" | "POPUP";
+/** NORMAL: vimcord has the keyboard. VISUAL: selecting messages. INSERT: typing in a text box. POPUP: a modal, menu
+ * or settings has it. */
+export type Mode = "NORMAL" | "VISUAL" | "INSERT" | "POPUP";
 
 export function isEditable(el: Element | null): el is HTMLElement {
     if (!(el instanceof HTMLElement)) return false;
@@ -22,5 +24,6 @@ export function somethingOpen() {
 
 export function mode(): Mode {
     if (isEditable(document.activeElement)) return "INSERT";
-    return somethingOpen() ? "POPUP" : "NORMAL";
+    if (somethingOpen()) return "POPUP";
+    return visual() ? "VISUAL" : "NORMAL";
 }

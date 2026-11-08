@@ -6,10 +6,10 @@
 
 import { copyWithToast } from "@utils/discord";
 import { Message } from "@vencord/discord-types";
-import { openUserProfileModal, SelectedGuildStore, UserStore } from "@webpack/common";
+import { Alerts, ChannelStore, MessageActions, openUserProfileModal, PermissionsBits, PermissionStore, SelectedGuildStore, UserStore } from "@webpack/common";
 
 import * as cursor from "./cursor";
-import { focusComposer, keybind, markUnread, messageShortcut, openReactionPicker, toast } from "./discord";
+import { disconnectVoice, focusComposer, keybind, markUnread, messageShortcut, openReactionPicker, toast, toggleCamera, toggleStream } from "./discord";
 import * as panes from "./panes";
 import * as picker from "./picker";
 import { settings } from "./settings";
@@ -36,6 +36,9 @@ export const prefixNames: Record<string, string> = {
     "]": "next",
     "<Space>": "leader",
     "<Space>w": "window",
+    "<Space>u": "ui",
+    "<Space>s": "search",
+    "<Space>v": "voice",
     "<C-w>": "window",
 };
 
@@ -70,8 +73,72 @@ const openLink = onMessage(m => {
     else toast("no link in this message");
 });
 
-function toggle(key: "hideChannels" | "hideServers") {
+function toggle(key: "hideChannels" | "hideServers" | "hideHeader") {
     settings.store[key] = !settings.store[key];
+}
+
+const name = (u: any) => u?.globalName ?? u?.global_name ?? u?.username ?? "unknown";
+
+/** <@123> and <#456> as the @name and #channel they show as */
+function readable(content: string) {
+    return content
+        .replace(/<@!?(\d+)>/g, (_, id) => "@" + name(UserStore.getUser(id)))
+        .replace(/<#(\d+)>/g, (_, id) => "#" + (ChannelStore.getChannel(id)?.name ?? id));
+}
+
+// visual mode: y and d on the selection
+export function yankSelection() {
+    const msgs = cursor.selected();
+    cursor.endVisual();
+    if (!msgs.length) return;
+    // one message: just its text, like yy. Several: who said what, one per line, so it reads back as a conversation
+    const text = msgs.length === 1 ? readable(msgs[0].content) : msgs.map(m => `${name(m.author)}: ${readable(m.content)}`).join("\n");
+    copyWithToast(text, `Copied ${msgs.length} message${msgs.length === 1 ? "" : "s"}`);
+}
+
+export function deleteSelection() {
+    const msgs = cursor.selected();
+    cursor.endVisual();
+    if (!msgs.length) return;
+    const channel = ChannelStore.getChannel(msgs[0].channel_id);
+    const canManage = PermissionStore.can(PermissionsBits.MANAGE_MESSAGES, channel);
+    const deletable = msgs.filter(m => own(m) || canManage);
+    const skipped = msgs.length - deletable.length;
+    if (!deletable.length) return toast("none of those are yours to delete");
+    Alerts.show({
+        title: `Delete ${deletable.length} message${deletable.length === 1 ? "" : "s"}?`,
+        body: skipped ? `${skipped} of the selected aren't yours and will be left alone.` : "This can't be undone.",
+        confirmText: "Delete",
+        confirmColor: "red",
+        cancelText: "Cancel",
+        async onConfirm() {
+            // one at a time, spaced out, so Discord's rate limit doesn't drop any
+            for (const m of deletable) {
+                try {
+                    await MessageActions.deleteMessage(m.channel_id, m.id);
+                } catch (e) {
+                    toast("couldn't delete a message", true);
+                }
+                await new Promise(r => setTimeout(r, 350));
+            }
+        },
+    });
+}
+
+/** / after a prefix (or in the help sheet): fuzzy-find a binding by what it does, and run it */
+export function searchKeys(prefix: string) {
+    const seen = new Set<string>();
+    const items = bindings.filter(b => b.keys.startsWith(prefix) && b.keys !== prefix).filter(b => {
+        // one entry per action: the shortest keys for it
+        if (seen.has(b.desc)) return false;
+        seen.add(b.desc);
+        return true;
+    }).map(b => ({
+        label: b.desc,
+        hint: b.keys.replaceAll("<Space>", "␣ ").replace(/<C-(.)>/g, "Ctrl-$1").replaceAll("<CR>", "Enter"),
+        select: () => b.run(),
+    }));
+    picker.openList(prefix ? `Keys: ${prefix.replaceAll("<Space>", "␣ ").trim()}` : "Keys", items, () => { });
 }
 
 // / searches what's focused: this server's channels (or DMs), your servers, or else Discord's message search
@@ -93,8 +160,12 @@ export const bindings: Binding[] = [
     { keys: "<CR>", group: "Panes", desc: "Open (server, channel, member)", in: "lists", run: panes.open },
     { keys: "l", group: "Panes", desc: "Open (server, channel, member)", in: "lists", run: panes.open },
     { keys: "<Space>e", group: "Panes", desc: "Hide / show channels", run: () => toggle("hideChannels") },
-    { keys: "<Space>s", group: "Panes", desc: "Hide / show servers", run: () => toggle("hideServers") },
     { keys: "<Space>m", group: "Panes", desc: "Hide / show members", run: () => keybind("TOGGLE_USERS") },
+    { keys: "<Space>ue", group: "Panes", desc: "Hide / show channels", run: () => toggle("hideChannels") },
+    { keys: "<Space>um", group: "Panes", desc: "Hide / show members", run: () => keybind("TOGGLE_USERS") },
+    { keys: "<Space>us", group: "Panes", desc: "Hide / show servers", run: () => toggle("hideServers") },
+    { keys: "<Space>uh", group: "Panes", desc: "Hide / show the channel header (pins, search)", run: () => toggle("hideHeader") },
+    { keys: "<Space>uz", group: "Panes", desc: "Zoom: only the chat (again to undo)", run: panes.toggleZoom },
     { keys: "<Space>z", group: "Panes", desc: "Zoom: only the chat (again to undo)", run: panes.toggleZoom },
     { keys: "<C-w>o", group: "Panes", desc: "Zoom: only the chat (again to undo)", run: panes.toggleZoom },
     { keys: "<Space>wm", group: "Panes", desc: "Zoom: only the chat (again to undo)", run: panes.toggleZoom },
@@ -150,9 +221,11 @@ export const bindings: Binding[] = [
             openUserProfileModal({ userId: m.author.id, guildId: SelectedGuildStore.getGuildId(), channelId: m.channel_id, messageId: m.id });
         })
     },
-    { keys: "yy", group: "Message", desc: "Copy text", in: "messages", run: onMessage(m => copyWithToast(m.content, "Copied message text")) },
+    { keys: "yy", group: "Message", desc: "Copy text", in: "messages", run: onMessage(m => copyWithToast(readable(m.content), "Copied message text")) },
     { keys: "yl", group: "Message", desc: "Copy link", in: "messages", run: onMessage(m => copyWithToast(link(m), "Copied message link")) },
     { keys: "yi", group: "Message", desc: "Copy ID", in: "messages", run: onMessage(m => copyWithToast(m.id, "Copied message ID")) },
+    { keys: "v", group: "Message", desc: "Visual mode: select messages (then y or d)", in: "messages", run: cursor.startVisual },
+    { keys: "V", group: "Message", desc: "Visual mode: select messages (then y or d)", in: "messages", run: cursor.startVisual },
 
     // going places
     { keys: "J", group: "Going places", desc: "Next channel", run: () => keybind("CHANNEL_NEXT") },
@@ -170,14 +243,24 @@ export const bindings: Binding[] = [
     { keys: "<Space>f", group: "Going places", desc: "Quick switcher", run: () => keybind("QUICKSWITCHER_SHOW") },
     { keys: "<Space>`", group: "Going places", desc: "Previous server (toggle)", run: () => keybind("TOGGLE_PREVIOUS_GUILD") },
     { keys: "/", group: "Going places", desc: "Search: messages, or the focused channel/server list", run: search },
-    { keys: "<Space>/", group: "Going places", desc: "Search everywhere", run: () => keybind("FOCUS_SEARCH", "mod+shift+f") },
+    { keys: "<Space>sg", group: "Going places", desc: "Search messages everywhere", run: () => keybind("FOCUS_SEARCH", "mod+shift+f") },
+    { keys: "<Space>ss", group: "Going places", desc: "Search messages in this channel", run: () => keybind("FOCUS_SEARCH", "mod+f") },
+    { keys: "<Space>sk", group: "Going places", desc: "Search keybindings", run: () => searchKeys("") },
 
     // everything else
     { keys: "i", group: "Other", desc: "Type a message", insert: true, run: focusComposer },
     { keys: "a", group: "Other", desc: "Type a message", insert: true, run: focusComposer },
     { keys: "<Space>p", group: "Other", desc: "Pinned messages", run: () => keybind("TOGGLE_CHANNEL_PINS") },
     { keys: "<Space>i", group: "Other", desc: "Inbox", run: () => keybind("TOGGLE_INBOX") },
-    { keys: "<Space>u", group: "Other", desc: "Upload a file", run: () => keybind("UPLOAD_FILE") },
+    { keys: "<Space>a", group: "Other", desc: "Attach a file", run: () => keybind("UPLOAD_FILE") },
+
+    // voice
+    { keys: "<Space>vm", group: "Voice", desc: "Mute / unmute", run: () => keybind("TOGGLE_MUTE") },
+    { keys: "<Space>vd", group: "Voice", desc: "Deafen / undeafen", run: () => keybind("TOGGLE_DEAFEN") },
+    { keys: "<Space>vs", group: "Voice", desc: "Stream: share screen / stop", run: toggleStream },
+    { keys: "<Space>vc", group: "Voice", desc: "Camera on / off", run: toggleCamera },
+    { keys: "<Space>vv", group: "Voice", desc: "Go to the voice channel you're in", run: () => keybind("RETURN_TO_AUDIO_CHANNEL") },
+    { keys: "<Space>vx", group: "Voice", desc: "Disconnect", run: disconnectVoice },
     { keys: "<Space>r", group: "Other", desc: "Mark server read", run: () => keybind("MARK_SERVER_READ") },
 ];
 
