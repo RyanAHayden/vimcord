@@ -95,6 +95,20 @@ function parseKitty(text: string) {
 
 const complete = (c: Record<string, string>) => !!(c.background && c.foreground && c.color4);
 
+/** ghostty config with its `config-file` includes (later ones win, like ghostty), up to a few levels deep */
+async function readGhostty(path: string, depth = 0): Promise<string | null> {
+    const text = await read(path);
+    if (text == null || depth > 3) return text;
+    let all = text;
+    for (const m of text.matchAll(/^\s*config-file\s*=\s*"?\??([^"\n]+?)"?\s*$/gm)) {
+        let inc = m[1].trim().replace(/^~(?=\/)/, home);
+        if (!inc.startsWith("/")) inc = join(path, "..", inc);
+        const sub = await readGhostty(inc, depth + 1);
+        if (sub) all += "\n" + sub;
+    }
+    return all;
+}
+
 async function colors(custom: string): Promise<[Record<string, string>, string] | null> {
     const candidates: [string, (t: string) => Record<string, string>][] = [];
     if (custom) candidates.push([custom, custom.endsWith(".toml") && !custom.includes("alacritty") ? parseColorsToml : custom.includes("ghostty") ? parseGhostty : custom.includes("kitty") ? parseKitty : parseAlacritty]);
@@ -108,7 +122,7 @@ async function colors(custom: string): Promise<[Record<string, string>, string] 
         [config("kitty/kitty.conf"), parseKitty],
     );
     for (const [path, parse] of candidates) {
-        const text = await read(path);
+        const text = parse === parseGhostty ? await readGhostty(path) : await read(path);
         if (!text) continue;
         const c = parse(text);
         if (complete(c)) return [c, path.replace(home, "~")];
@@ -117,9 +131,11 @@ async function colors(custom: string): Promise<[Record<string, string>, string] 
 }
 
 async function font(): Promise<string | null> {
+    for (const path of [config("ghostty/config"), config("ghostty/config.ghostty")]) {
+        const m = (await readGhostty(path))?.match(/^\s*font-family\s*=\s*"?([^"\n]+?)"?\s*$/m);
+        if (m) return m[1].trim();
+    }
     const sources: [string, RegExp][] = [
-        [config("ghostty/config"), /^\s*font-family\s*=\s*"?([^"\n]+?)"?\s*$/m],
-        [config("ghostty/config.ghostty"), /^\s*font-family\s*=\s*"?([^"\n]+?)"?\s*$/m],
         [config("alacritty/alacritty.toml"), /\[font\.normal\][^[]*?family\s*=\s*"([^"]+)"/],
         [config("kitty/kitty.conf"), /^\s*font_family\s+(.+?)\s*$/m],
     ];
