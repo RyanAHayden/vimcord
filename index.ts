@@ -53,7 +53,7 @@ const schedule = () => void (frame ||= requestAnimationFrame(update));
 // Discord's quick switcher (Space Space): typing filters, Ctrl-j/k or Ctrl-n/p move; Esc leaves the box for
 // hjkl mode (j/k move, Enter opens, i or / types again, Esc closes) instead of closing it
 function quickSwitcher() {
-    const input = document.querySelector<HTMLInputElement>('[role="dialog"] input[aria-controls]');
+    const input = document.querySelector<HTMLInputElement>('[class*="quickswitcher_"] input[aria-controls]');
     const list = input && document.getElementById(input.getAttribute("aria-controls")!);
     return list?.getAttribute("role") === "listbox" ? input : null;
 }

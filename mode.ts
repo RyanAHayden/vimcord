@@ -25,7 +25,7 @@ export function somethingOpen() {
 export function mode(): Mode {
     if (isEditable(document.activeElement)) return "INSERT";
     // the quick switcher's hjkl mode
-    if (document.querySelector('[role="dialog"] input[aria-controls]')) return "SWITCHER";
+    if (document.querySelector('[class*="quickswitcher_"] input[aria-controls]')) return "SWITCHER";
     if (somethingOpen()) return "POPUP";
     return visual() ? "VISUAL" : "NORMAL";
 }
