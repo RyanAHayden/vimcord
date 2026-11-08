@@ -19,6 +19,16 @@
     --vc-match: var(--text-link, #00a8fc);
     --vc-num: var(--vc-popup);
     --vc-section: var(--background-mod-subtle, rgb(128 128 128 / 15%));
+    --vc-section-fg: var(--vc-fg);
+    --vc-mode-fg: var(--vc-bg);
+    --vc-bar-fg: var(--vc-muted);
+    --vc-bar-bg: var(--vc-bg);
+    --vc-float-title: var(--vc-strong);
+    --vc-key: var(--vc-match);
+    --vc-group: var(--vc-accent);
+    --vc-desc: var(--vc-fg);
+    --vc-sep: var(--vc-muted);
+    --vc-error: #ef4444;
 }
 
 /* the message cursor, like nvim's cursorline: a line highlight with a bar in the mode's color */
@@ -83,7 +93,7 @@
     margin: 0 auto;
     padding: 0 4px;
     font-size: 13px;
-    color: var(--vc-strong);
+    color: var(--vc-float-title);
 }
 
 .vimcord-float kbd {
@@ -119,11 +129,21 @@
 
 .vimcord-whichkey-row kbd {
     min-width: 2ch;
-    color: var(--vc-match);
+    color: var(--vc-key);
 }
 
-.vimcord-group {
-    color: var(--vc-visual);
+.vimcord-whichkey-row > span {
+    color: var(--vc-desc);
+}
+
+.vimcord-whichkey-row > kbd::after {
+    content: " →";
+    font-weight: 400;
+    color: var(--vc-sep);
+}
+
+.vimcord-whichkey-row > .vimcord-group {
+    color: var(--vc-group);
 }
 
 /* ? help */
@@ -148,7 +168,7 @@
 .vimcord-help h3 {
     margin: 0 0 6px;
     font-size: 13px;
-    color: var(--vc-normal);
+    color: var(--vc-group);
 }
 
 .vimcord-help-sub {
@@ -180,7 +200,7 @@
 }
 
 .vimcord-help-keys kbd {
-    color: var(--vc-match);
+    color: var(--vc-key);
 }
 
 /* / picker, after nvim's snacks picker */
@@ -300,8 +320,8 @@
     font-size: 12px;
     line-height: 22px;
     white-space: nowrap;
-    color: var(--vc-muted);
-    background: var(--vc-bg);
+    color: var(--vc-bar-fg);
+    background: var(--vc-bar-bg);
 }
 
 .vimcord-bar > span {
@@ -309,18 +329,20 @@
 }
 
 .vimcord-bar-mode {
-    --vc-mode: var(--vc-normal);
     font-weight: 700;
-    color: var(--vc-bg);
+    color: var(--vc-mode-fg);
     background: var(--vc-mode);
 }
 
-.vimcord-bar[data-mode="insert"] .vimcord-bar-mode { --vc-mode: var(--vc-insert); }
-.vimcord-bar[data-mode="visual"] .vimcord-bar-mode { --vc-mode: var(--vc-visual); }
-.vimcord-bar[data-mode="popup"] .vimcord-bar-mode { --vc-mode: var(--vc-popup); }
+/* the mode's color, which the arrow after it and the pane section's text take on, as in lualine */
+.vimcord-bar { --vc-mode: var(--vc-normal); }
+
+.vimcord-bar[data-mode="insert"] { --vc-mode: var(--vc-insert); }
+.vimcord-bar[data-mode="visual"] { --vc-mode: var(--vc-visual); }
+.vimcord-bar[data-mode="popup"] { --vc-mode: var(--vc-popup); }
 
 .vimcord-bar-pane {
-    color: var(--vc-fg);
+    color: var(--vc-mode);
     background: var(--vc-section);
 }
 
@@ -348,7 +370,7 @@
 
 .vimcord-bar-hints b {
     font-weight: 400;
-    color: var(--vc-fg);
+    color: var(--vc-key);
 }
 
 /* with a Nerd Font, lualine's powerline arrows between the sections */
@@ -364,14 +386,14 @@
     position: absolute;
     right: -10px;
     width: 10px;
-    color: var(--vc-mode, var(--vc-section));
+    color: var(--vc-mode);
     background: var(--vc-section);
     line-height: 22px;
 }
 
 .vimcord-nerd .vimcord-bar-pane::after {
     color: var(--vc-section);
-    background: var(--vc-bg);
+    background: var(--vc-bar-bg);
 }
 
 /* the mode bar's color on the panes too, as nvim shows which window has focus */
@@ -381,7 +403,7 @@
 }
 
 .vimcord-nerd .vimcord-bar:is([data-mode="insert"], [data-mode="popup"]) .vimcord-bar-mode::after {
-    background: var(--vc-bg);
+    background: var(--vc-bar-bg);
 }
 
 /* the channel header, hidden but still there (so its search can take focus and show it while in use) */
@@ -401,5 +423,16 @@
 }
 
 .vimcord-bar-voice { color: var(--vc-insert); }
-.vimcord-bar-off { color: var(--vc-bg); background: var(--red-2, #ef4444); font-weight: 700; }
-.vimcord-bar-live { color: var(--vc-bg); background: var(--vc-insert); font-weight: 700; }
+.vimcord-bar-off { color: var(--vc-mode-fg); background: var(--vc-error); font-weight: 700; }
+.vimcord-bar-live { color: var(--vc-mode-fg); background: var(--vc-insert); font-weight: 700; }
+
+/* with the traffic lights gone, the server list doesn't need to leave room for them */
+.vimcord-hide-winbuttons [class*="guilds_"] {
+    margin-top: 0 !important;
+}
+
+/* Windows/Linux window buttons are Discord's own (macOS's are native: see native.ts) */
+.vimcord-hide-winbuttons [class*="winButton"],
+.vimcord-hide-winbuttons [class*="winButtons_"] {
+    display: none !important;
+}

@@ -21,7 +21,8 @@ const HINTS: Record<string, string[][]> = {
     messages: [["j/k", "move"], ["r", "reply"], ["e", "edit"], ["+", "react"], ["i", "type"], ["1-4", "panes"], ["␣", "leader"], ["?", "help"]],
     list: [["j/k", "move"], ["⏎", "open"], ["esc", "back"], ["1-4", "panes"], ["?", "help"]],
     VISUAL: [["j/k", "extend"], ["y", "copy"], ["d", "delete"], ["o", "other end"], ["esc", "cancel"]],
-    INSERT: [["esc", "normal"], ["⏎", "send"], ["^n/^p", "suggestions"]],
+    INSERT: [["esc", "normal"], ["⏎", "send"], ["^j/^k", "suggestions"]],
+    SWITCHER: [["j/k", "move"], ["⏎", "open"], ["i", "type"], ["esc", "close"]],
     POPUP: [["esc", "close"], ["keys go to Discord", ""]],
 };
 
@@ -49,18 +50,21 @@ function voice(): [string, string][] {
 export function render(m: Mode, pane: PaneId, pending: string, hints: boolean) {
     const ctx = m === "NORMAL" ? pane === "messages" ? "messages" : "list" : m;
     if (m === "VISUAL") pending ||= `${selected().length} selected`;
+    // the chat panel's label (nvim look) shows the channel, like nvim's winbar shows the file
+    document.body.style.setProperty("--vc-chat-label", JSON.stringify(where().split(" › ").pop() || "chat"));
     const v = voice();
     const key = [m, pane, pending, hints, where(), v.join()].join("|");
     if (key === last && bar) return;
     last = key;
 
     bar ??= document.body.appendChild(Object.assign(document.createElement("div"), { className: "vimcord-bar" }));
-    bar.dataset.mode = m.toLowerCase();
+    bar.dataset.mode = m === "SWITCHER" ? "normal" : m.toLowerCase();
     bar.replaceChildren();
     const span = (cls: string, text: string) => bar!.appendChild(Object.assign(document.createElement("span"), { className: cls, textContent: text }));
 
-    span("vimcord-bar-mode", m);
+    span("vimcord-bar-mode", m === "SWITCHER" ? "NORMAL" : m);
     if (m === "NORMAL" || m === "VISUAL") span("vimcord-bar-pane", pane);
+    if (m === "SWITCHER") span("vimcord-bar-pane", "switcher");
     span("vimcord-bar-where", where());
     span("vimcord-bar-fill", "");
     if (pending) span("vimcord-bar-pending", pending.replaceAll("<Space>", "␣"));
@@ -75,6 +79,7 @@ export function render(m: Mode, pane: PaneId, pending: string, hints: boolean) {
 }
 
 export function remove() {
+    document.body.style.removeProperty("--vc-chat-label");
     bar?.remove();
     bar = null;
     last = "";

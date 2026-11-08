@@ -69,6 +69,12 @@ export const settings = definePluginSettings({
         default: true,
         onChange: applyHidden,
     },
+    hideWindowButtons: {
+        type: OptionType.BOOLEAN,
+        description: "Hide the window's close/minimize/maximize buttons (macOS traffic lights too); close with the keyboard instead",
+        default: true,
+        onChange: (v: boolean) => look.windowButtons(!v),
+    },
     autoHideWidth: {
         type: OptionType.NUMBER,
         description: "Hide the channel and member lists while the window is narrower than this many pixels, so the chat gets the room (2 and 4 still show them). 0 turns it off",

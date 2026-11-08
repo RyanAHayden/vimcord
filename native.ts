@@ -7,9 +7,10 @@
 // Reads the terminal's colors and font for the nvim look, the way nvim gets them: Omarchy's current theme
 // (colors.toml, or alacritty.toml in older themes), else the terminal's own config (Ghostty, Alacritty, Kitty).
 
-import { IpcMainInvokeEvent } from "electron";
-import { readFile } from "fs/promises";
-import { homedir } from "os";
+import { BrowserWindow, IpcMainInvokeEvent } from "electron";
+import { execFile } from "child_process";
+import { readFile, unlink, writeFile } from "fs/promises";
+import { homedir, tmpdir } from "os";
 import { join } from "path";
 
 export interface Terminal {
@@ -132,4 +133,73 @@ async function font(): Promise<string | null> {
 export async function readTerminal(_: IpcMainInvokeEvent, customColorsPath = ""): Promise<Terminal> {
     const [c, f] = await Promise.all([colors(customColorsPath), font()]);
     return { colors: c?.[0] ?? {}, source: c?.[1] ?? null, font: f };
+}
+
+/** macOS's traffic lights are native, so hiding them happens here (Windows/Linux buttons are Discord's own, hidden by CSS) */
+export function setWindowButtons(e: IpcMainInvokeEvent, visible: boolean) {
+    BrowserWindow.fromWebContents(e.sender)?.setWindowButtonVisibility?.(visible);
+}
+
+// nvim's own colors: run it headless with the user's config and read the highlight groups vimcord copies (lualine's
+// mode colors, CursorLine, Visual, float borders, which-key...). Only when the theme changes, it takes ~0.4s.
+
+const HL_GROUPS = [
+    "Normal", "NormalFloat", "FloatBorder", "FloatTitle", "CursorLine", "Visual", "WinSeparator", "Comment", "Title",
+    "Special", "Directory", "Search", "PmenuSel", "CursorLineNr", "DiagnosticError", "DiagnosticWarn", "DiagnosticOk",
+    "lualine_a_normal", "lualine_a_insert", "lualine_a_visual", "lualine_a_command", "lualine_b_normal", "lualine_c_normal",
+    "SnacksPickerMatch", "SnacksPickerBorder", "SnacksPickerTitle", "SnacksPickerIdx",
+    "WhichKey", "WhichKeyGroup", "WhichKeyDesc", "WhichKeySeparator", "WhichKeyBorder", "WhichKeyTitle",
+];
+
+const dumpScript = (out: string) => `
+pcall(function() require("lazy").load({ plugins = { "lualine.nvim", "snacks.nvim", "which-key.nvim" } }) end)
+vim.wait(300)
+local out = {}
+for _, g in ipairs(vim.json.decode([=[${JSON.stringify(HL_GROUPS)}]=])) do
+  local ok, h = pcall(vim.api.nvim_get_hl, 0, { name = g, link = false })
+  if ok then
+    local e = {}
+    if h.fg then e.fg = string.format("#%06x", h.fg) end
+    if h.bg then e.bg = string.format("#%06x", h.bg) end
+    out[g] = e
+  end
+end
+local f = io.open([=[${out}]=], "w")
+f:write(vim.json.encode(out))
+f:close()
+vim.cmd("qa!")
+`;
+
+const NVIM = ["nvim", "/opt/homebrew/bin/nvim", "/usr/local/bin/nvim", "/usr/bin/nvim", join(home, ".local/bin/nvim"), "/snap/bin/nvim"];
+
+let lastError = "";
+export const nvimError = () => lastError;
+
+function run(bin: string, args: string[]) {
+    return new Promise<boolean>(resolve =>
+        execFile(bin, args, { timeout: 10000 }, (err, stdout, stderr) => {
+            if (err) lastError = `${bin}: ${err.message} | ${String(stdout).slice(-300)} | ${String(stderr).slice(-300)}`;
+            resolve(!err);
+        }));
+}
+
+export async function readNvim(_: IpcMainInvokeEvent): Promise<Record<string, { fg?: string; bg?: string; }> | null> {
+    const id = `${process.pid}-${Date.now()}`;
+    const script = join(tmpdir(), `vimcord-hl-${id}.lua`);
+    const out = join(tmpdir(), `vimcord-hl-${id}.json`);
+    await writeFile(script, dumpScript(out));
+    try {
+        for (const bin of NVIM) {
+            // the trailing qa! quits even if the script errors, so a broken config can't leave nvim running
+            if (!await run(bin, ["--headless", "-c", `luafile ${script}`, "-c", "qa!"])) continue;
+            const text = await read(out);
+            if (text) return JSON.parse(text);
+        }
+        return null;
+    } catch {
+        return null;
+    } finally {
+        unlink(script).catch(() => { });
+        unlink(out).catch(() => { });
+    }
 }

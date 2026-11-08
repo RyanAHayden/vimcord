@@ -49,6 +49,43 @@ function update() {
 
 const schedule = () => void (frame ||= requestAnimationFrame(update));
 
+// Discord's quick switcher (Space Space): typing filters, Ctrl-j/k or Ctrl-n/p move; Esc leaves the box for
+// hjkl mode (j/k move, Enter opens, i or / types again, Esc closes) instead of closing it
+function quickSwitcher() {
+    const input = document.querySelector<HTMLInputElement>('[role="dialog"] input[aria-controls]');
+    const list = input && document.getElementById(input.getAttribute("aria-controls")!);
+    return list?.getAttribute("role") === "listbox" ? input : null;
+}
+
+/** a key to the switcher's input, which takes it whether or not it has focus */
+function sendKey(target: HTMLElement, key: string, keyCode: number) {
+    const ev = new KeyboardEvent("keydown", { key, code: key, bubbles: true, cancelable: true });
+    for (const prop of ["keyCode", "which"]) Object.defineProperty(ev, prop, { get: () => keyCode });
+    (ev as any).vimcord = true;
+    target.dispatchEvent(ev);
+}
+
+export const switcherNav = () => {
+    const qs = quickSwitcher();
+    return qs != null && document.activeElement !== qs;
+};
+
+function onSwitcherKey(e: KeyboardEvent, qs: HTMLInputElement) {
+    const typing = document.activeElement === qs;
+    const k = keyName(e);
+    const down = k === "<C-j>" || k === "<C-n>" || !typing && (k === "j" || e.key === "ArrowDown");
+    const up = k === "<C-k>" || k === "<C-p>" || !typing && (k === "k" || e.key === "ArrowUp");
+    if (down || up) return consume(e), sendKey(qs, down ? "ArrowDown" : "ArrowUp", down ? 40 : 38);
+    if (typing) {
+        if (k === "<Esc>") consume(e), qs.blur();
+        return;
+    }
+    consume(e);
+    if (k === "<CR>" || k === "l" || k === "o") sendKey(qs, "Enter", 13);
+    else if (k === "i" || k === "a" || k === "/") qs.focus();
+    else if (k === "<Esc>" || k === "q") sendKey(qs, "Escape", 27);
+}
+
 const isComposer = (el: Element) => !!el.closest('[class*="channelTextArea"]') && !el.closest('li[id^="chat-messages-"]');
 
 function onFocusIn(e: FocusEvent) {
@@ -89,6 +126,10 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 function handleKey(e: KeyboardEvent) {
+    if ((e as any).vimcord) return;
+    const qs = quickSwitcher();
+    if (qs) return onSwitcherKey(e, qs);
+
     if (e.isComposing || e.repeat && !/^[jk]$|^<C-[dufbey]>$/.test(keyName(e) ?? "")) {
         if (helpOpen() || pending) consume(e);
         return;
@@ -245,6 +286,7 @@ export default definePlugin({
     start() {
         cursor.setScrollOff(settings.store.scrollOff);
         applyLook();
+        look.windowButtons(!settings.store.hideWindowButtons);
         panes.setOnChange(schedule);
         setOnSettingsChange(schedule);
         applyHidden();
@@ -275,6 +317,7 @@ export default definePlugin({
         panes.clear();
         statusbar.remove();
         look.disable();
+        look.windowButtons(true);
         document.body.classList.remove("vimcord-insert", "vimcord-visual", "vimcord-has-bar");
     },
 
