@@ -7,7 +7,8 @@
 // The nvim look: system24 (refact0r's TUI theme) for the panels, in nvim's own colors (read from nvim's highlight
 // groups, so it's whatever colorscheme nvim has, Omarchy's current theme included), in the terminal's font.
 // vimcord's pieces copy nvim's: the bar is lualine, the cursor is CursorLine, the selection Visual, floats have
-// FloatBorder, which-key its own colors. Without nvim, the terminal's palette stands in, mapped the same way.
+// FloatBorder, which-key its own colors. Without nvim, the terminal's palette stands in, mapped the same way; with
+// no theme at all, Tokyo Night.
 // The terminal's palette is re-read every few seconds; when it changes (an Omarchy theme switch), nvim is asked again.
 
 import { PluginNative } from "@utils/types";
@@ -21,14 +22,41 @@ const SYSTEM24 = "https://refact0r.github.io/system24/build/system24.css";
 
 type Hl = Record<string, { fg?: string; bg?: string; }>;
 
-// used when there's no terminal config to read: ryha silver, the palette this was made with
-const FALLBACK: Record<string, string> = {
-    background: "#000000", foreground: "#e5e5e5", cursor: "#e5e5e5",
-    selection_background: "#3a3a3a", selection_foreground: "#ffffff",
-    color0: "#000000", color1: "#ef4444", color2: "#22c55e", color3: "#f59e0b",
-    color4: "#3b82f6", color5: "#a855f7", color6: "#06b6d4", color7: "#e5e5e5",
-    color8: "#737373", color9: "#f87171", color10: "#4ade80", color11: "#fbbf24",
-    color12: "#60a5fa", color13: "#c084fc", color14: "#22d3ee", color15: "#ffffff",
+// with no theme to read (no Omarchy, no terminal colors, no nvim): Tokyo Night, as tokyonight.nvim draws it
+const TOKYONIGHT: Record<string, string> = {
+    background: "#1a1b26", foreground: "#c0caf5", cursor: "#c0caf5",
+    selection_background: "#283457", selection_foreground: "#c0caf5",
+    color0: "#15161e", color1: "#f7768e", color2: "#9ece6a", color3: "#e0af68",
+    color4: "#7aa2f7", color5: "#bb9af7", color6: "#7dcfff", color7: "#a9b1d6",
+    color8: "#414868", color9: "#ff899d", color10: "#9fe044", color11: "#faba4a",
+    color12: "#8db0ff", color13: "#c7a9ff", color14: "#a4daff", color15: "#c0caf5",
+};
+
+const TOKYONIGHT_HL: Hl = {
+    Normal: { fg: "#c0caf5", bg: "#1a1b26" },
+    CursorLine: { bg: "#292e42" },
+    Visual: { bg: "#283457" },
+    FloatBorder: { fg: "#27a1b9" },
+    FloatTitle: { fg: "#27a1b9" },
+    WinSeparator: { fg: "#3b4261" },
+    Comment: { fg: "#565f89" },
+    Title: { fg: "#7aa2f7" },
+    Special: { fg: "#2ac3de" },
+    Directory: { fg: "#7aa2f7" },
+    Search: { bg: "#3d59a1" },
+    CursorLineNr: { fg: "#ff9e64" },
+    DiagnosticError: { fg: "#db4b4b" },
+    DiagnosticWarn: { fg: "#e0af68" },
+    lualine_a_normal: { fg: "#15161e", bg: "#7aa2f7" },
+    lualine_a_insert: { fg: "#15161e", bg: "#9ece6a" },
+    lualine_a_visual: { fg: "#15161e", bg: "#bb9af7" },
+    lualine_a_command: { fg: "#15161e", bg: "#e0af68" },
+    lualine_b_normal: { fg: "#7aa2f7", bg: "#3b4261" },
+    lualine_c_normal: { fg: "#a9b1d6", bg: "#16161e" },
+    WhichKey: { fg: "#7dcfff" },
+    WhichKeyGroup: { fg: "#7aa2f7" },
+    WhichKeyDesc: { fg: "#bb9af7" },
+    WhichKeySeparator: { fg: "#565f89" },
 };
 
 let style: HTMLStyleElement | null = null;
@@ -43,7 +71,7 @@ const mix = (a: string, b: string, pct: number) => `color-mix(in oklab, ${a} ${p
 
 /** the colors vimcord uses, by what they're for: nvim's highlight groups where it has them, else the palette */
 function scheme(t: Terminal, h: Hl) {
-    const c = { ...FALLBACK, ...t.colors };
+    const c = { ...TOKYONIGHT, ...t.colors };
     const fg_ = (g: string) => h[g]?.fg;
     const bg_ = (g: string) => h[g]?.bg;
     // a transparent nvim (no Normal bg) sits on the terminal's background
@@ -58,10 +86,10 @@ function scheme(t: Terminal, h: Hl) {
         floatTitle: fg_("SnacksPickerTitle") ?? fg_("FloatTitle") ?? fg_("Title") ?? c.color4,
         cursorline: bg_("CursorLine") ?? mix(fg, bg, 18),
         visualBg: bg_("Visual") ?? c.selection_background ?? mix(fg, bg, 22),
-        normal: bg_("lualine_a_normal") ?? c.color3,
+        normal: bg_("lualine_a_normal") ?? c.color4,
         insert: bg_("lualine_a_insert") ?? c.color2,
-        visual: bg_("lualine_a_visual") ?? c.color13,
-        command: bg_("lualine_a_command") ?? c.color9,
+        visual: bg_("lualine_a_visual") ?? c.color5,
+        command: bg_("lualine_a_command") ?? c.color3,
         modeFg: fg_("lualine_a_normal") ?? bg,
         sectionFg: fg_("lualine_b_normal") ?? fg,
         sectionBg: bg_("lualine_b_normal") ?? mix(fg, bg, 12),
@@ -240,7 +268,9 @@ body.vimcord-look ::-webkit-scrollbar-track { background: transparent !important
 
 function apply() {
     if (!term) return;
-    const text = css(term, hl ?? {});
+    // no theme anywhere: Tokyo Night's nvim colors too, not just its palette
+    const h = hl && Object.keys(hl).length ? hl : term.source ? {} : TOKYONIGHT_HL;
+    const text = css(term, h);
     if (text === last) return;
     last = text;
     style ??= document.head.appendChild(Object.assign(document.createElement("style"), { id: "vimcord-look" }));
