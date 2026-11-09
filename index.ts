@@ -44,6 +44,8 @@ function update() {
     c.toggle("vimcord-has-bar", settings.store.statusBar);
     if ((m === "NORMAL" || m === "VISUAL") && panes.current() === "messages") cursor.place();
     panes.tick();
+    // left on while a popup was open: off once it's closed
+    keyboardModeOff();
     if (settings.store.statusBar) statusbar.render(m, panes.current(), pending, settings.store.statusBarHints);
     else statusbar.remove();
 }
@@ -85,6 +87,103 @@ function onSwitcherKey(e: KeyboardEvent, qs: HTMLInputElement) {
     if (k === "<CR>" || k === "l" || k === "o") sendKey(qs, "Enter", 13);
     else if (k === "i" || k === "a" || k === "/") qs.focus();
     else if (k === "<Esc>" || k === "q") sendKey(qs, "Escape", 27);
+}
+
+// Discord's menus (right-click, the Active Now card's) already take the arrows: j/k/h/l are those, q closes
+function onMenuKey(e: KeyboardEvent, menu: HTMLElement) {
+    const arrows: Record<string, [string, number]> = { j: ["ArrowDown", 40], k: ["ArrowUp", 38], h: ["ArrowLeft", 37], l: ["ArrowRight", 39], q: ["Escape", 27] };
+    const arrow = arrows[keyName(e) ?? ""];
+    if (!arrow) return;
+    consume(e);
+    const active = document.activeElement as HTMLElement | null;
+    sendKey(active && menu.contains(active) ? active : menu, ...arrow);
+}
+
+const PROFILE_ITEM = "data-vimcord-profile-item";
+
+// what j/k/h/l move between in a profile: anything Tab would reach (buttons, links, tabs, mutual servers...),
+// except text boxes (i goes there)
+function profileItems(profile: HTMLElement) {
+    return [...profile.querySelectorAll<HTMLElement>('button, a[href], [role="button"], [role="tab"], [role="link"], [role="listitem"][tabindex], [tabindex="0"]')]
+        .filter(el => el.getClientRects().length && !el.closest("[disabled], [aria-disabled='true']")
+            && !el.parentElement?.closest('button, a[href], [role="button"], [role="link"]') && !isEditable(el));
+}
+
+const center = (r: DOMRect) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+
+/** the item nearest `from` in a direction on screen, preferring ones in line with it */
+function nearest(items: HTMLElement[], from: HTMLElement, dir: "up" | "down" | "left" | "right") {
+    const a = center(from.getBoundingClientRect());
+    let best: HTMLElement | undefined, bestScore = Infinity;
+    for (const el of items) {
+        if (el === from) continue;
+        const b = center(el.getBoundingClientRect());
+        const along = dir === "down" ? b.y - a.y : dir === "up" ? a.y - b.y : dir === "right" ? b.x - a.x : a.x - b.x;
+        const across = dir === "up" || dir === "down" ? Math.abs(b.x - a.x) : Math.abs(b.y - a.y);
+        if (along < 4) continue;
+        const score = along + across * 2;
+        if (score < bestScore) [best, bestScore] = [el, score];
+    }
+    return best;
+}
+
+/** Ctrl-h/l: the item across the split (the profile's column beside this one) nearest in height. The column is the
+ * widest box around `from` that still has items wholly beside it. */
+function acrossSplit(items: HTMLElement[], from: HTMLElement, root: HTMLElement, dir: "left" | "right") {
+    let side: HTMLElement[] = [];
+    for (let el: HTMLElement | null = from; el && el !== root; el = el.parentElement) {
+        const r = el.getBoundingClientRect();
+        const beside = items.filter(i => {
+            const b = i.getBoundingClientRect();
+            return dir === "right" ? b.left >= r.right - 1 : b.right <= r.left + 1;
+        });
+        if (!beside.length && side.length) break;
+        if (beside.length) side = beside;
+    }
+    const { y } = center(from.getBoundingClientRect());
+    return side.sort((a, b) => Math.abs(center(a.getBoundingClientRect()).y - y) - Math.abs(center(b.getBoundingClientRect()).y - y))[0];
+}
+
+const profileDirs: Record<string, "up" | "down" | "left" | "right"> = { j: "down", k: "up", h: "left", l: "right" };
+
+// an open profile (popout or modal): j/k/h/l move between its buttons, links, tabs and servers by where they are on
+// screen, Ctrl-h/l jump across its split, and Enter clicks; Ctrl-d/u scroll, H/L its tabs, i its message box, q closes. The item gets real
+// focus, so Discord draws its focus ring, and Tab carries on from it.
+function onProfileKey(e: KeyboardEvent, profile: HTMLElement) {
+    const k = keyName(e);
+    const active = document.activeElement as HTMLElement | null;
+    const marked = profile.querySelector<HTMLElement>(`[${PROFILE_ITEM}]`);
+    const current = active && active !== marked && profile.contains(active) && profileItems(profile).includes(active) ? active : marked;
+    const split = k === "<C-h>" ? "left" : k === "<C-l>" ? "right" : undefined;
+    const dir = profileDirs[k ?? ""] ?? split;
+    if (dir) {
+        consume(e);
+        const items = profileItems(profile);
+        if (!items.length) return;
+        const next = !current || !items.includes(current) ? dir === "up" || dir === "left" ? items.at(-1) : items[0]
+            : split ? acrossSplit(items, current, profile, split) : nearest(items, current, dir);
+        if (!next) return;
+        marked?.removeAttribute(PROFILE_ITEM);
+        next.setAttribute(PROFILE_ITEM, "");
+        next.focus({ preventScroll: true });
+        next.scrollIntoView({ block: "nearest" });
+        return;
+    }
+    if (k === "<CR>" && current) return consume(e), current.click();
+    const scroll = { "<C-d>": 300, "<C-u>": -300, "<C-e>": 40, "<C-y>": -40 }[k ?? ""];
+    if (scroll) return consume(e), panes.scrollable(profile)?.scrollBy({ top: scroll });
+    if (k === "H" || k === "L") {
+        consume(e);
+        const tabs = [...profile.querySelectorAll<HTMLElement>('[role="tab"]')];
+        const i = tabs.findIndex(t => t.getAttribute("aria-selected") === "true");
+        if (tabs.length) tabs[(i + (k === "L" ? 1 : -1) + tabs.length) % tabs.length].click();
+    } else if (k === "i" || k === "a") {
+        consume(e);
+        profile.querySelector<HTMLElement>('[role="textbox"], textarea, input[type="text"]')?.focus();
+    } else if (k === "q") {
+        consume(e);
+        sendKey(profile, "Escape", 27);
+    }
 }
 
 const isComposer = (el: Element) => !!el.closest('[class*="channelTextArea"]') && !el.closest('li[id^="chat-messages-"]');
@@ -160,6 +259,11 @@ function handleKey(e: KeyboardEvent) {
 
     const target = document.activeElement;
     if (isEditable(target)) return onInsertKey(e, target);
+    const menu = document.querySelector<HTMLElement>('[role="menu"]');
+    if (menu) return reset(), onMenuKey(e, menu);
+    // the whole dialog it's in: parts of the profile (mutual servers, friends) sit beside the profile itself
+    const profile = document.querySelector<HTMLElement>(".user-profile-popout, .user-profile-modal, .user-profile-modal-v2");
+    if (profile) return reset(), onProfileKey(e, profile.closest<HTMLElement>('[role="dialog"]') ?? profile);
     if (somethingOpen()) return reset();
 
     const key = keyName(e);
@@ -187,8 +291,8 @@ function handleKey(e: KeyboardEvent) {
         if (key === "v" || key === "V") return consume(e), cursor.endVisual();
     }
 
-    // in the messages pane, Enter on a focused button or link (Tab navigation) is Discord's: it clicks it
-    if (!pending && key === "<CR>" && panes.current() === "messages") return;
+    // Enter on a focused button or link in the chat (Tab navigation, or one just clicked) is Discord's: it clicks it
+    if (!pending && key === "<CR>" && !panes.inList() && target?.closest('a, button, [role="button"]')) return;
 
     if (!pending && key === "?") {
         consume(e);
@@ -216,8 +320,7 @@ function handleKey(e: KeyboardEvent) {
 
     if (binding) {
         consume(e);
-        const inMessages = panes.current() === "messages";
-        if (binding.in === "messages" && !inMessages || binding.in === "lists" && inMessages) return;
+        if (binding.in === "messages" && panes.current() !== "messages" || binding.in === "lists" && !panes.inList()) return;
         // visual mode only moves; acting on the selection is y and d
         if (cursor.visual() && binding.group !== "Moving") return;
         // bindings meant to start typing (i, a, r) keep the focus they give the message box
@@ -268,7 +371,9 @@ function onInsertKey(e: KeyboardEvent, target: HTMLElement) {
     target.dispatchEvent(arrow);
 }
 
+// with nothing open; in a popup, Tab between its buttons (with Discord's focus outline) is how you get around it
 function keyboardModeOff() {
+    if (settings.store.discordKeyboardMode || somethingOpen()) return;
     if (AccessibilityStore.keyboardModeEnabled) FluxDispatcher.dispatch({ type: "ACCESSIBILITY_KEYBOARD_MODE_DISABLE" });
 }
 
@@ -295,7 +400,7 @@ export default definePlugin({
         cursor.setScrollOff(settings.store.scrollOff);
         applyLook();
         look.windowButtons(!settings.store.hideWindowButtons);
-        if (!settings.store.discordKeyboardMode) keyboardModeOff();
+        keyboardModeOff();
         panes.setOnChange(schedule);
         setOnSettingsChange(schedule);
         applyHidden();
@@ -331,9 +436,10 @@ export default definePlugin({
     },
 
     flux: {
-        // Discord's keyboard mode (Tab between buttons, focus outlines) gets in the way of vimcord's: switch it back off
+        // Discord's keyboard mode (Tab between buttons, focus outlines) gets in the way of vimcord's: switch it back off,
+        // unless a popup is open
         ACCESSIBILITY_KEYBOARD_MODE_ENABLE() {
-            if (!settings.store.discordKeyboardMode) setTimeout(keyboardModeOff);
+            setTimeout(keyboardModeOff);
         },
         CHANNEL_SELECT() {
             reset();

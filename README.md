@@ -30,16 +30,22 @@ Then enable **VimCord** in Vencord's plugin settings and restart Discord. To upd
 
 | Panes | |
 |---|---|
-| `1` `2` `3` `4` | focus servers, channels, messages, members |
+| `1` `2` `3` `4` | focus servers, channels, messages (or friends), members (or a DM's profile, or Active Now) |
 | `Tab` / `Shift-Tab` | next / previous pane (wraps around) |
 | `Ctrl-h` / `Ctrl-l` | pane to the left / right |
-| `Enter` `l` `o` | open the highlighted server, channel or member |
+| `Enter` `l` `o` | open the highlighted server, channel, member or friend |
 | `/` | in the channels or servers pane: fuzzy-find in it |
 | `Space e` / `Space m` | hide / show channels, members |
 | `Space u` | UI toggles: `e` channels, `m` members, `s` servers, `h` channel header, `z` zoom |
 | `Space z`, `Ctrl-w o` | zoom: only the chat |
 
-A hidden pane shows while it's focused. The channel and member lists hide on their own in a narrow window.
+In an open profile, `j`/`k`/`h`/`l` move over its buttons, links and servers (`Enter` clicks), `Ctrl-h`/`Ctrl-l` jump
+between its two columns, `Ctrl-d`/`Ctrl-u` scroll, `Tab` works as in
+Discord, `H`/`L` switch its tabs, `i` goes to its message box and `q` closes it. In
+Discord's menus (right-click, or a card's menu in Active Now), `j`/`k`/`h`/`l` move and `q` closes.
+
+A hidden pane shows while it's focused. The channel and member lists (and a DM's profile) hide on their own in a narrow
+window. On the Friends page, pane 3 is the friends list: `j`/`k` move, `Enter` opens the DM, `H`/`L` switch tabs, and pane 4 is the Active Now cards: `Enter` opens a card's menu (message, join voice, profiles).
 
 | Moving | |
 |---|---|
@@ -58,7 +64,7 @@ A hidden pane shows while it's focused. The channel and member lists hide on the
 | `yy` `yl` `yi` | copy text, link, ID |
 | `+` | react |
 | `p` `f` `t` `u` | pin, forward, open/start thread, mark unread |
-| `o`, `gu` | open its first link, author's profile |
+| `o` or `Enter`, `gu` | open its first link, author's profile (in a list: the member, friend or DM's profile) |
 
 | Going places | |
 |---|---|

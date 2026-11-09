@@ -160,8 +160,9 @@ export const bindings: Binding[] = [
     { keys: "<S-Tab>", group: "Panes", desc: "Previous pane (wraps around)", run: () => panes.cycle(-1) },
     { keys: "<C-h>", group: "Panes", desc: "Pane to the left", run: () => panes.step(-1) },
     { keys: "<C-l>", group: "Panes", desc: "Pane to the right", run: () => panes.step(1) },
-    { keys: "<CR>", group: "Panes", desc: "Open (server, channel, member)", in: "lists", run: panes.open },
-    { keys: "l", group: "Panes", desc: "Open (server, channel, member)", in: "lists", run: panes.open },
+    // on a message, Enter opens its link like o
+    { keys: "<CR>", group: "Panes", desc: "Open (server, channel, member, friend; a message's link)", run: () => panes.inList() ? panes.open() : openLink() },
+    { keys: "l", group: "Panes", desc: "Open (server, channel, member, friend)", in: "lists", run: panes.open },
     { keys: "<Space>e", group: "Panes", desc: "Hide / show channels", run: () => toggle("hideChannels") },
     { keys: "<Space>m", group: "Panes", desc: "Hide / show members", run: () => keybind("TOGGLE_USERS") },
     { keys: "<Space>ue", group: "Panes", desc: "Hide / show channels", run: () => toggle("hideChannels") },
@@ -184,9 +185,10 @@ export const bindings: Binding[] = [
     { keys: "<C-b>", group: "Moving", desc: "Page up", run: () => panes.page(-1) },
     { keys: "<C-e>", group: "Moving", desc: "Scroll down a line", in: "messages", run: () => cursor.scrollLines(1) },
     { keys: "<C-y>", group: "Moving", desc: "Scroll up a line", in: "messages", run: () => cursor.scrollLines(-1) },
-    { keys: "H", group: "Moving", desc: "Top of screen", in: "messages", run: () => cursor.screen("top") },
+    // on the Friends page, H/L switch tabs instead
+    { keys: "H", group: "Moving", desc: "Top of screen (Friends: previous tab)", in: "messages", run: () => panes.onFriends() ? panes.tab(-1) : cursor.screen("top") },
     { keys: "M", group: "Moving", desc: "Middle of screen", in: "messages", run: () => cursor.screen("middle") },
-    { keys: "L", group: "Moving", desc: "Bottom of screen", in: "messages", run: () => cursor.screen("bottom") },
+    { keys: "L", group: "Moving", desc: "Bottom of screen (Friends: next tab)", in: "messages", run: () => panes.onFriends() ? panes.tab(1) : cursor.screen("bottom") },
     { keys: "zz", group: "Moving", desc: "Center the message", in: "messages", run: () => cursor.align("center") },
     { keys: "zt", group: "Moving", desc: "Message to top", in: "messages", run: () => cursor.align("top") },
     { keys: "zb", group: "Moving", desc: "Message to bottom", in: "messages", run: () => cursor.align("bottom") },
@@ -218,11 +220,16 @@ export const bindings: Binding[] = [
     },
     { keys: "u", group: "Message", desc: "Mark unread from here", in: "messages", run: onMessage(m => void markUnread(m)) },
     // in a list, o opens like Enter
-    { keys: "o", group: "Message", desc: "Open the first link", run: () => panes.current() === "messages" ? openLink() : panes.open() },
+    { keys: "o", group: "Message", desc: "Open the first link", run: () => panes.inList() ? panes.open() : openLink() },
     {
-        keys: "gu", group: "Message", desc: "Author's profile", in: "messages", run: onMessage(m => {
-            openUserProfileModal({ userId: m.author.id, guildId: SelectedGuildStore.getGuildId(), channelId: m.channel_id, messageId: m.id });
-        })
+        keys: "gu", group: "Message", desc: "Profile (author, or the highlighted member/friend/DM)", run: () => {
+            if (!panes.inList()) return onMessage(m => {
+                openUserProfileModal({ userId: m.author.id, guildId: SelectedGuildStore.getGuildId(), channelId: m.channel_id, messageId: m.id });
+            })();
+            const userId = panes.highlightedUser();
+            if (userId) openUserProfileModal({ userId, guildId: SelectedGuildStore.getGuildId() });
+            else toast("no one to show here");
+        }
     },
     { keys: "yy", group: "Message", desc: "Copy text", in: "messages", run: onMessage(m => copyWithToast(readable(m.content), "Copied message text")) },
     { keys: "yl", group: "Message", desc: "Copy link", in: "messages", run: onMessage(m => copyWithToast(link(m), "Copied message link")) },

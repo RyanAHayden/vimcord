@@ -6,9 +6,10 @@
 
 // Panes, lazygit style: 1 servers, 2 channels, 3 messages, 4 members. The focused pane gets j/k/gg/G/Enter; the
 // messages pane is the message cursor (cursor.ts), the others are a highlighted item in Discord's own list. A pane
-// that's hidden shows while it's focused ("peeks") and hides again when focus leaves it.
+// that's hidden shows while it's focused ("peeks") and hides again when focus leaves it. On the Friends page there's
+// no chat, so the messages pane is a list too: the friends, with H/L for the tabs (Online, All, Pending...).
 
-import { SelectedChannelStore, SelectedGuildStore } from "@webpack/common";
+import { ChannelStore, SelectedChannelStore, SelectedGuildStore } from "@webpack/common";
 
 import * as cursor from "./cursor";
 import { keybind } from "./discord";
@@ -44,12 +45,62 @@ const lists: Record<Exclude<PaneId, "messages">, ListPane> = {
                 : document.querySelector(`[data-list-item-id$="___${id}"][data-list-item-id^="private-channels-"]`)?.getAttribute("data-list-item-id") ?? null;
         },
     },
+    // in a DM, the profile sidebar stands where the member list would, and on the Friends page the Active Now column
     members: {
-        container: () => document.querySelector<HTMLElement>('[data-list-id^="members-"]')?.closest("aside") ?? null,
+        container: () => document.querySelector<HTMLElement>('[data-list-id^="members-"]')?.closest("aside") ?? profileBox()
+            ?? document.querySelector<HTMLElement>('[class*="nowPlayingColumn_"]'),
         items: () => all('[data-list-id^="members-"] [data-list-item-id]'),
         selected: () => null,
     },
 };
+
+const friendsTabs = () => document.querySelector<HTMLElement>('main [role="navigation"] [role="tablist"]');
+
+const friends: ListPane = {
+    container: () => document.querySelector<HTMLElement>('[data-list-id="people-list"]'),
+    items: () => all('[data-list-id="people-list"] [data-list-item-id^="people-list___"]'),
+    selected: () => null,
+};
+
+/** the Friends page is showing instead of a chat */
+export const onFriends = () => friendsTabs() != null && !document.querySelector('[data-list-id="chat-messages"]');
+
+// the Active Now cards, pane 4 on the Friends page; Enter opens a card's menu (message, join voice, profiles...)
+const activity: ListPane = {
+    container: () => document.querySelector<HTMLElement>('[class*="nowPlayingColumn_"]'),
+    items: () => all('[class*="nowPlayingColumn_"] [aria-haspopup="menu"]'),
+    selected: () => null,
+};
+
+/** the list j/k move in: the focused list pane, or on the Friends page the friends and the Active Now cards */
+function activeList() {
+    if (focused === "messages") return onFriends() ? friends : null;
+    if (focused === "members" && onFriends()) return activity;
+    return lists[focused];
+}
+
+/** j/k, Enter and o act on a list right now, not on the message cursor */
+export const inList = () => activeList() != null;
+
+const keyOf = (el: Element) => el.getAttribute("data-list-item-id")!;
+// items by Discord's own list ids; the Active Now cards have none, so by position
+const keysOf = (items: HTMLElement[]) => items.map((el, i) => el.getAttribute("data-list-item-id") ?? `#${i}`);
+const find = (pane: ListPane, key: string | undefined) => {
+    const items = pane.items();
+    return key ? items[keysOf(items).indexOf(key)] ?? null : null;
+};
+
+/** the user behind the highlighted item: a member, a friend, or a DM's recipient */
+export function highlightedUser(): string | undefined {
+    if (!inList()) return;
+    const key = highlighted[focused];
+    // in a DM the members pane is the profile sidebar, with nothing to highlight: the DM's own user
+    const id = key?.split("___")[1] ?? (focused === "members" ? SelectedChannelStore.getChannelId() : undefined);
+    if (!id) return;
+    if (focused !== "channels" && key) return id;
+    const channel = ChannelStore.getChannel(id);
+    return channel?.isDM() ? channel.getRecipientId() : undefined;
+}
 
 let focused: PaneId = "messages";
 const highlighted: Partial<Record<PaneId, string>> = {};
@@ -64,8 +115,16 @@ let onChange = () => { };
 
 export const current = () => focused;
 
-/** keeps the member list's box marked as Discord re-renders it (called with the rest of the mode display) */
-export const tick = () => void markMembersBox();
+/** keeps the member list's box marked as Discord re-renders it, and the highlight on the Friends page (called with
+ * the rest of the mode display) */
+export function tick() {
+    markMembersBox();
+    profileBox();
+    if (focused !== "messages" || !onFriends()) return;
+    const first = friends.items()[0];
+    if (!highlighted.messages?.startsWith("people-list___") && first) highlighted.messages = keyOf(first);
+    if (highlighted.messages && !document.querySelector(`[${ITEM}]`)) paint();
+}
 export const isZoomed = () => zoomed;
 export const setOnChange = (fn: () => void) => void (onChange = fn);
 
@@ -115,6 +174,18 @@ function markMembersBox() {
     return box;
 }
 
+// marks the DM profile sidebar's box, pane 4 in a DM, for hiding and its label (the class is on the profile inside it)
+function profileBox() {
+    const profile = document.querySelector<HTMLElement>(".user-profile-sidebar");
+    const box = profile?.closest<HTMLElement>("aside") ?? profile;
+    if (box && !box.hasAttribute("data-vimcord-profile")) box.setAttribute("data-vimcord-profile", "");
+    return box ?? null;
+}
+
+/** the element that scrolls inside el (or el itself) */
+export const scrollable = (el: HTMLElement | null) => el && [el, ...el.querySelectorAll<HTMLElement>("*")]
+    .find(e => e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY));
+
 function paint() {
     for (const el of document.querySelectorAll(`[${ITEM}], [${FOCUS}], [data-vimcord-pane-label]`)) {
         el.removeAttribute(ITEM);
@@ -123,11 +194,10 @@ function paint() {
     }
     const box = markMembersBox();
     if (focused === "members") box?.setAttribute("data-vimcord-pane-label", "");
-    if (focused === "messages") return;
-    const pane = lists[focused];
-    pane.container()?.setAttribute(FOCUS, "");
-    const key = highlighted[focused];
-    const el = key ? document.querySelector<HTMLElement>(`[data-list-item-id="${CSS.escape(key)}"]`) : null;
+    const pane = activeList();
+    if (!pane) return;
+    if (focused !== "messages") pane.container()?.setAttribute(FOCUS, "");
+    const el = find(pane, highlighted[focused]);
     el?.setAttribute(ITEM, "");
     el?.scrollIntoView({ block: "nearest" });
 }
@@ -142,7 +212,7 @@ export function focus(id: PaneId) {
     applyClasses();
 
     if (id === "messages") return paint();
-    if (id === "members" && !membersShown()) {
+    if (id === "members" && !membersShown() && !onFriends()) {
         // no member list in this channel (or it's off): turn it on just while focused
         membersPeeking = true;
         keybind("TOGGLE_USERS");
@@ -151,9 +221,9 @@ export function focus(id: PaneId) {
     // open channel to show up so the highlight starts there
     let tries = 0;
     const pick = () => {
-        if (focused !== id) return;
-        const pane = lists[id];
-        const keys = pane.items().map(i => i.getAttribute("data-list-item-id")!);
+        const pane = activeList();
+        if (focused !== id || !pane) return;
+        const keys = keysOf(pane.items());
         const sel = pane.selected();
         if (sel && !keys.includes(sel) && ++tries < 20) return void setTimeout(pick, 50);
         if (!highlighted[id] || !keys.includes(highlighted[id]!) || sel && keys.includes(sel) && tries) highlighted[id] = sel && keys.includes(sel) ? sel : keys[0];
@@ -175,11 +245,12 @@ export function cycle(dir: 1 | -1) {
 }
 
 export function move(n: number) {
-    if (focused === "messages") return cursor.move(n);
-    const pane = lists[focused];
+    const pane = activeList();
+    if (!pane) return cursor.move(n);
     const items = pane.items();
-    if (!items.length) return;
-    const keys = items.map(i => i.getAttribute("data-list-item-id")!);
+    // the DM profile has nothing to pick: j/k scroll it
+    if (!items.length) return void scrollable(pane.container())?.scrollBy({ top: n * 40 });
+    const keys = keysOf(items);
     const i = keys.indexOf(highlighted[focused] ?? "");
     const next = i < 0 ? 0 : Math.max(0, Math.min(keys.length - 1, i + n));
     highlighted[focused] = keys[next];
@@ -187,31 +258,41 @@ export function move(n: number) {
 }
 
 export function edge(last: boolean) {
-    if (focused === "messages") return last ? cursor.last() : cursor.first();
+    const pane = activeList();
+    if (!pane) return last ? cursor.last() : cursor.first();
     // virtualized lists only render what's near the screen, so scroll to the end first and pick once it's there
-    const el = lists[focused].items()[0]?.closest<HTMLElement>('[class*="scroller"]');
+    const el = pane.items()[0]?.closest<HTMLElement>('[class*="scroller"]');
     if (el) el.scrollTop = last ? el.scrollHeight : 0;
     requestAnimationFrame(() => {
-        const items = lists[focused as Exclude<PaneId, "messages">].items();
-        const target = last ? items.at(-1) : items[0];
-        if (target) highlighted[focused] = target.getAttribute("data-list-item-id")!;
+        const items = pane.items();
+        const keys = keysOf(items);
+        if (keys.length) highlighted[focused] = last ? keys.at(-1) : keys[0];
         paint();
     });
 }
 
 export function page(fraction: number) {
-    if (focused === "messages") return cursor.page(fraction);
-    const items = lists[focused].items();
+    const pane = activeList();
+    if (!pane) return cursor.page(fraction);
+    const items = pane.items();
     const h = items[0]?.getBoundingClientRect().height || 32;
-    const box = lists[focused].container()?.getBoundingClientRect().height ?? 600;
+    const box = pane.container()?.getBoundingClientRect().height ?? 600;
     move(Math.round(box * fraction / h) || Math.sign(fraction));
+}
+
+/** H / L on the Friends page: the previous / next tab, wrapping around */
+export function tab(dir: 1 | -1) {
+    const tabs = [...friendsTabs()?.querySelectorAll<HTMLElement>('[role="tab"]') ?? []];
+    if (!tabs.length) return;
+    const i = tabs.findIndex(t => t.getAttribute("aria-selected") === "true");
+    tabs[(i + dir + tabs.length) % tabs.length].click();
+    delete highlighted.messages;
 }
 
 /** Enter / l / o in a list pane: what clicking the item does, then on to the next pane where that makes sense */
 export function open() {
-    if (focused === "messages") return;
-    const key = highlighted[focused];
-    const el = key ? document.querySelector<HTMLElement>(`[data-list-item-id="${CSS.escape(key)}"]`) : null;
+    const pane = activeList();
+    const el = pane && find(pane, highlighted[focused]);
     if (!el) return;
     const from = focused;
     el.click();
@@ -227,6 +308,12 @@ export function open() {
 export function onClick(e: MouseEvent) {
     const t = e.target as Element | null;
     if (!t?.closest) return;
+    const row = t.closest('[data-list-item-id^="people-list___"]');
+    if (row) {
+        if (focused !== "messages") focus("messages");
+        highlighted.messages = keyOf(row);
+        return requestAnimationFrame(paint);
+    }
     if (t.closest('main[class*="chatContent"]')) {
         if (focused !== "messages") focus("messages");
         return;
@@ -234,7 +321,7 @@ export function onClick(e: MouseEvent) {
     for (const id of ["servers", "channels", "members"] as const) {
         if (!lists[id].container()?.contains(t)) continue;
         const item = t.closest<HTMLElement>("[data-list-item-id]");
-        if (item) highlighted[id] = item.getAttribute("data-list-item-id")!;
+        if (item) highlighted[id] = keyOf(item);
         // clicking a channel opens it, and then you'd want j/k on its messages
         if (id === "channels" && t.closest("a[href]")) return focus("messages");
         if (focused !== id) focus(id);

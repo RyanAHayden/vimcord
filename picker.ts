@@ -87,7 +87,7 @@ function match(text: string, q: string): { score: number; at: number[]; } | null
 }
 
 function label(text: string, at: number[]) {
-    const span = document.createElement("span");
+    const span = Object.assign(document.createElement("span"), { className: "vimcord-picker-label" });
     let plain = "";
     const flush = () => { if (plain) span.append(plain); plain = ""; };
     [...text].forEach((ch, i) => {

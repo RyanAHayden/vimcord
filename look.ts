@@ -204,7 +204,7 @@ function tuiStyle(fontStack: string) {
 }
 
 /* panel labels like lazygit's: the pane's number for 1-4, in the border, the focused one in the mode's color */
-body.vimcord-look :is([class*="guilds_"], [class*="panels_"], [class*="sidebarList_"], [class*="subtitleContainer_"], [class*="messagesWrapper_"], [class*="channelTextArea_"], [data-vimcord-members-box])::after {
+body.vimcord-look :is([class*="guilds_"], [class*="panels_"], [class*="sidebarList_"], [class*="subtitleContainer_"], [class*="messagesWrapper_"], [class*="channelTextArea_"], [class*="peopleColumn_"], [class*="nowPlayingColumn_"], [data-vimcord-members-box], [data-vimcord-profile])::after {
     color: var(--vc-muted) !important;
     background: var(--vc-bg) !important;
     white-space: nowrap !important;
@@ -213,11 +213,28 @@ body.vimcord-look [class*="guilds_"]::after { content: "[1] nav" !important; }
 /* further in than the others, so the server column's "[1] nav" (wider than its column) doesn't run into it */
 body.vimcord-look [class*="sidebarList_"]::after { content: "[2] channels" !important; left: 32px !important; }
 body.vimcord-look [class*="messagesWrapper_"]::after { content: "[3] " var(--vc-chat-label, "chat") !important; }
+body.vimcord-look [class*="peopleColumn_"]::after { content: "[3] friends" !important; }
+body.vimcord-look [class*="nowPlayingColumn_"]::after { content: "[4] activity" !important; }
 /* system24 labels the member list's container (which panes.ts marks, since a :has() for it would make every DOM
    change recheck the whole page); the list itself would get a second label */
 body.vimcord-look [data-vimcord-members-box]::after { content: "[4] members" !important; }
 body.vimcord-look [data-vimcord-members-box] > [class*="membersWrap_"]::after { content: none !important; }
-body.vimcord-look:not(.vimcord-list-focused):not(.vimcord-insert) [class*="messagesWrapper_"]::after,
+/* system24 doesn't box the DM profile sidebar: box and label it like the member list */
+body.vimcord-look [data-vimcord-profile] {
+    position: relative !important;
+    overflow: visible !important;
+    border: var(--border-thickness, 2px) solid var(--border, var(--vc-muted)) !important;
+}
+body.vimcord-look [data-vimcord-profile]::after {
+    content: "[4] profile" !important;
+    position: absolute;
+    top: -10px;
+    left: 8px;
+    padding: 0 4px;
+    z-index: 100;
+    font-size: 16px;
+}
+body.vimcord-look:not(.vimcord-list-focused):not(.vimcord-insert) :is([class*="messagesWrapper_"], [class*="peopleColumn_"])::after,
 body.vimcord-look [data-vimcord-pane]::after,
 body.vimcord-look [data-vimcord-members-box][data-vimcord-pane-label]::after { color: var(--vc-normal) !important; }
 body.vimcord-look.vimcord-visual [class*="messagesWrapper_"]::after { color: var(--vc-visual) !important; }

@@ -55,8 +55,9 @@
     box-shadow: inset 3px 0 0 var(--vc-visual);
 }
 
-/* the highlighted item in a focused server/channel/member list, and the focused pane */
-[data-vimcord-item] {
+/* the highlighted item in a focused server/channel/member list or an open profile, and the focused pane */
+[data-vimcord-item],
+[data-vimcord-profile-item] {
     border-radius: 0;
     outline: 1px solid var(--vc-normal) !important;
     outline-offset: -1px;
@@ -73,6 +74,8 @@
 .vimcord-hide-channels [class*="sidebar_"] > [class*="panels_"],
 .vimcord-hide-servers [class*="sidebar_"] > nav[class*="guilds_"],
 .vimcord-hide-members [class*="membersWrap_"],
+.vimcord-hide-members [data-vimcord-profile],
+.vimcord-hide-members [class*="nowPlayingColumn_"],
 .vimcord-zoom [class*="subtitleContainer_"] {
     display: none !important;
 }
@@ -108,7 +111,10 @@
     right: 16px;
     bottom: 40px;
     z-index: 10000;
-    max-width: min(640px, calc(100vw - 32px));
+    /* wide enough for a long prefix (Space) to fit in columns rather than run off the top of the window */
+    max-width: min(960px, calc(100vw - 32px));
+    max-height: calc(100vh - 56px);
+    overflow: hidden;
     padding: 4px 12px 8px;
     font-size: 13px;
     pointer-events: none;
@@ -289,7 +295,16 @@
     font-weight: 700;
 }
 
+/* a long label gives way to the hint (a channel's category, a binding's keys) rather than pushing it off the row */
+.vimcord-picker-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .vimcord-picker-hint {
+    flex: none;
+    max-width: 40%;
     margin-left: auto;
     padding-left: 12px;
     font-size: 12px;
