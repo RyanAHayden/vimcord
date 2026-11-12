@@ -71,7 +71,9 @@ export function render(m: Mode, pane: PaneId, pending: string, hints: boolean) {
     for (const [cls, text] of v) span(cls, text);
     if (hints) {
         const h = span("vimcord-bar-hints", "");
-        for (const [k, d] of HINTS[ctx]) {
+        // in a DM, c calls (C without ringing)
+        const dm = ctx === "messages" && ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.isPrivate();
+        for (const [k, d] of dm ? [...HINTS[ctx].slice(0, 5), ["c/C", "call"], ...HINTS[ctx].slice(5)] : HINTS[ctx]) {
             const item = h.appendChild(document.createElement("span"));
             item.append(Object.assign(document.createElement("b"), { textContent: k }), d ? " " + d : "");
         }
