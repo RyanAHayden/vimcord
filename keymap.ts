@@ -9,7 +9,7 @@ import { Message } from "@vencord/discord-types";
 import { Alerts, ChannelStore, MessageActions, openUserProfileModal, PermissionsBits, PermissionStore, SelectedGuildStore, UserStore } from "@webpack/common";
 
 import * as cursor from "./cursor";
-import { disconnectVoice, focusComposer, keybind, markUnread, messageShortcut, openReactionPicker, toast, toggleCamera, toggleStream } from "./discord";
+import { disconnectVoice, focusComposer, keybind, markUnread, messageShortcut, openReactionPicker, startCall, toast, toggleCamera, toggleStream } from "./discord";
 import * as panes from "./panes";
 import * as picker from "./picker";
 import { settings } from "./settings";
@@ -265,6 +265,8 @@ export const bindings: Binding[] = [
     { keys: "<Space>a", group: "Other", desc: "Attach a file", run: () => keybind("UPLOAD_FILE") },
 
     // voice
+    { keys: "c", group: "Voice", desc: "Call this DM (rings them)", run: () => startCall(true) },
+    { keys: "C", group: "Voice", desc: "Call this DM without ringing", run: () => startCall(false) },
     { keys: "<Space>vm", group: "Voice", desc: "Mute / unmute", run: () => keybind("TOGGLE_MUTE") },
     { keys: "<Space>vd", group: "Voice", desc: "Deafen / undeafen", run: () => keybind("TOGGLE_DEAFEN") },
     { keys: "<Space>vs", group: "Voice", desc: "Stream: share screen / stop", run: toggleStream },

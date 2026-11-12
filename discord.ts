@@ -35,6 +35,8 @@ const MessageShortcuts: Record<"reply" | "edit" | "delete" | "pin" | "forward" |
 const markUnreadFn: (channelId: string, messageId: string) => Promise<void> = findByCodeLazy("Marking unread");
 
 const VoiceActions: { disconnect(): void; } = findByPropsLazy("selectVoiceChannel", "disconnect");
+// call(channelId, video, ring, recipientId): joins the DM's call, ringing the others if ring is set
+const CallActions: { call(channelId: string, video: boolean, ring: boolean, recipientId?: string): void; } = findByPropsLazy("call", "ring", "stopRinging");
 const MediaActions: { setVideoEnabled(on: boolean): void; } = findByPropsLazy("toggleSelfMute", "setVideoEnabled");
 const ApplicationStreamingStore = findStoreLazy("ApplicationStreamingStore") as { getCurrentUserActiveStream(): unknown; };
 const stopOwnStream: () => void = findByCodeLazy("getCurrentUserActiveStream();null!=");
@@ -128,6 +130,17 @@ export function toggleCamera() {
         MediaActions.setVideoEnabled(!MediaEngineStore.isVideoEnabled());
     } catch (e) {
         unavailable("camera", e);
+    }
+}
+
+/** calls the open DM or group DM (joins its call if one's going); ring false joins without ringing anyone */
+export function startCall(ring: boolean) {
+    const channel = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
+    if (!channel?.isPrivate()) return toast("calls are for DMs and group DMs");
+    try {
+        CallActions.call(channel.id, false, ring, channel.isDM() ? channel.getRecipientId() : undefined);
+    } catch (e) {
+        unavailable("call", e);
     }
 }
 

@@ -79,6 +79,7 @@ window. On the Friends page, pane 3 is the friends list: `j`/`k` move, `Enter` o
 
 | Voice | |
 |---|---|
+| `c` / `C` | call the open DM or group DM / join its call without ringing anyone |
 | `Space v m` / `Space v d` | mute / deafen |
 | `Space v s` | share screen / stop |
 | `Space v c` | camera |
