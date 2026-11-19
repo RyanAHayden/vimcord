@@ -45,7 +45,7 @@ Discord, `H`/`L` switch its tabs, `i` goes to its message box and `q` closes it.
 Discord's menus (right-click, or a card's menu in Active Now), `j`/`k`/`h`/`l` move and `q` closes.
 
 A hidden pane shows while it's focused. The channel and member lists (and a DM's profile) hide on their own in a narrow
-window. On the Friends page, pane 3 is the friends list: `j`/`k` move, `Enter` opens the DM, `H`/`L` switch tabs, and pane 4 is the Active Now cards: `Enter` opens a card's menu (message, join voice, profiles).
+window. GIFs in the message under the cursor play as if hovered. On the Friends page, pane 3 is the friends list: `j`/`k` move, `Enter` opens the DM, `H`/`L` switch tabs, and pane 4 is the Active Now cards: `Enter` opens a card's menu (message, join voice, profiles).
 
 | Moving | |
 |---|---|
@@ -64,7 +64,8 @@ window. On the Friends page, pane 3 is the friends list: `j`/`k` move, `Enter` o
 | `yy` `yl` `yi` | copy text, link, ID |
 | `+` | react |
 | `p` `f` `t` `u` | pin, forward, open/start thread, mark unread |
-| `o` or `Enter`, `gu` | open its first link, author's profile (in a list: the member, friend or DM's profile) |
+| `o`, `gu` | open its first link, author's profile (in a list: the member, friend or DM's profile) |
+| `Enter` | play its video (again to pause), or else open its first link |
 
 | Going places | |
 |---|---|

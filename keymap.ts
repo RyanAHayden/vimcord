@@ -10,6 +10,7 @@ import { Alerts, ChannelStore, MessageActions, openUserProfileModal, Permissions
 
 import * as cursor from "./cursor";
 import { disconnectVoice, focusComposer, keybind, markUnread, messageShortcut, openReactionPicker, startCall, toast, toggleCamera, toggleStream } from "./discord";
+import { hasVideo, playVideo } from "./media";
 import * as panes from "./panes";
 import * as picker from "./picker";
 import { settings } from "./settings";
@@ -71,6 +72,12 @@ const openLink = onMessage(m => {
     const url = firstUrl(m);
     if (url) VencordNative.native.openExternal(url);
     else toast("no link in this message");
+});
+
+// Enter on a message plays its video (again to pause), or else opens its link like o
+const openOrPlay = onMessage(m => {
+    const li = cursor.currentEl();
+    if (!(li && hasVideo(m) && playVideo(li))) openLink();
 });
 
 function toggle(key: "hideChannels" | "hideServers" | "hideHeader") {
@@ -160,8 +167,8 @@ export const bindings: Binding[] = [
     { keys: "<S-Tab>", group: "Panes", desc: "Previous pane (wraps around)", run: () => panes.cycle(-1) },
     { keys: "<C-h>", group: "Panes", desc: "Pane to the left", run: () => panes.step(-1) },
     { keys: "<C-l>", group: "Panes", desc: "Pane to the right", run: () => panes.step(1) },
-    // on a message, Enter opens its link like o
-    { keys: "<CR>", group: "Panes", desc: "Open (server, channel, member, friend; a message's link)", run: () => panes.inList() ? panes.open() : openLink() },
+    // on a message, Enter plays its video or opens its link
+    { keys: "<CR>", group: "Panes", desc: "Open (server, channel, member, friend; a message's video or link)", run: () => panes.inList() ? panes.open() : openOrPlay() },
     { keys: "l", group: "Panes", desc: "Open (server, channel, member, friend)", in: "lists", run: panes.open },
     { keys: "<Space>e", group: "Panes", desc: "Hide / show channels", run: () => toggle("hideChannels") },
     { keys: "<Space>m", group: "Panes", desc: "Hide / show members", run: () => keybind("TOGGLE_USERS") },

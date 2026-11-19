@@ -12,6 +12,7 @@ import { Message } from "@vencord/discord-types";
 import { MessageActions, MessageStore, SelectedChannelStore } from "@webpack/common";
 
 import { getMessage, hasMoreAfter, scrollToPresent } from "./discord";
+import { hover } from "./media";
 
 const ATTR = "data-vimcord-cursor";
 const VISUAL = "data-vimcord-visual";
@@ -56,8 +57,9 @@ function paint() {
         if (!sel.has(idOf(el))) el.removeAttribute(VISUAL);
     for (const el of items())
         if (sel.has(idOf(el)) && !el.hasAttribute(VISUAL)) el.setAttribute(VISUAL, "");
+    const el = cursorId ? elOf(cursorId) : null;
+    hover(el);
     if (!cursorId) return;
-    const el = elOf(cursorId);
     if (el) {
         if (!el.hasAttribute(ATTR)) el.setAttribute(ATTR, "");
     } else if (l && !document.getElementById(`chat-messages-${SelectedChannelStore.getChannelId()}-${cursorId}`)) {
@@ -76,6 +78,8 @@ export function clear() {
     observer.disconnect();
     observed = null;
 }
+
+export const currentEl = () => cursorId ? elOf(cursorId) : null;
 
 export function current(): Message | undefined {
     return cursorId && active() ? getMessage(cursorId) : undefined;
