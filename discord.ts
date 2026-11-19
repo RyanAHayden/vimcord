@@ -10,7 +10,7 @@
 import { Logger } from "@utils/Logger";
 import { Channel, Message } from "@vencord/discord-types";
 import { filters, findByCodeLazy, findByPropsLazy, findLazy, findStoreLazy, mapMangledModuleLazy } from "@webpack";
-import { ChannelStore, ComponentDispatch, MediaEngineStore, MessageStore, SelectedChannelStore, showToast } from "@webpack/common";
+import { ChannelStore, ComponentDispatch, FluxDispatcher, MediaEngineStore, MessageStore, SelectedChannelStore, showToast } from "@webpack/common";
 
 export const logger = new Logger("VimCord");
 
@@ -68,6 +68,17 @@ export function keybind(name: string, combo?: string) {
         k.action(fakeEvent(), combo ?? k.binds[0]);
     } catch (e) {
         unavailable(name.toLowerCase().replaceAll("_", " "), e);
+    }
+}
+
+/** Discord's Ctrl-U: the member list, or in a DM the profile sidebar. Its keybind fails when run from here, so this
+ * sends the action that keybind ends with */
+export function toggleMembers() {
+    const dm = ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.isDM();
+    try {
+        FluxDispatcher.dispatch({ type: dm ? "USER_PROFILE_SIDEBAR_TOGGLE_SECTION" : "CHANNEL_TOGGLE_MEMBERS_SECTION" } as any);
+    } catch (e) {
+        unavailable(dm ? "profile sidebar" : "member list", e);
     }
 }
 

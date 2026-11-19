@@ -44,7 +44,8 @@ between its two columns, `Ctrl-d`/`Ctrl-u` scroll, `Tab` works as in
 Discord, `H`/`L` switch its tabs, `i` goes to its message box and `q` closes it. In
 Discord's menus (right-click, or a card's menu in Active Now), `j`/`k`/`h`/`l` move and `q` closes.
 
-A hidden pane shows while it's focused. The channel and member lists (and a DM's profile) hide on their own in a narrow
+A hidden pane shows while it's focused, and a hidden channel or member list (or DM profile) comes out when the mouse
+goes to its edge of the window. The channel and member lists (and a DM's profile) hide on their own in a narrow
 window. GIFs in the message under the cursor play as if hovered. On the Friends page, pane 3 is the friends list: `j`/`k` move, `Enter` opens the DM, `H`/`L` switch tabs, and pane 4 is the Active Now cards: `Enter` opens a card's menu (message, join voice, profiles).
 
 | Moving | |
@@ -86,7 +87,7 @@ window. GIFs in the message under the cursor play as if hovered. On the Friends 
 | `Space v c` | camera |
 | `Space v v` / `Space v x` | go to your voice channel / disconnect |
 
-Plus `Space p` pins, `Space i` inbox, `Space a` attach a file, `Space r` mark server read, `Space s k` search keys.
+Plus `Space p` pins, `Space i` or `Space n` inbox (mentions, unreads, notifications), `Space a` attach a file, `Space r` mark server read, `Space s k` search keys.
 
 ## The look
 

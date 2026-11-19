@@ -9,7 +9,7 @@ import { Message } from "@vencord/discord-types";
 import { Alerts, ChannelStore, MessageActions, openUserProfileModal, PermissionsBits, PermissionStore, SelectedGuildStore, UserStore } from "@webpack/common";
 
 import * as cursor from "./cursor";
-import { disconnectVoice, focusComposer, keybind, markUnread, messageShortcut, openReactionPicker, startCall, toast, toggleCamera, toggleStream } from "./discord";
+import { disconnectVoice, focusComposer, keybind, markUnread, messageShortcut, openReactionPicker, startCall, toast, toggleCamera, toggleMembers, toggleStream } from "./discord";
 import { hasVideo, playVideo } from "./media";
 import * as panes from "./panes";
 import * as picker from "./picker";
@@ -171,9 +171,9 @@ export const bindings: Binding[] = [
     { keys: "<CR>", group: "Panes", desc: "Open (server, channel, member, friend; a message's video or link)", run: () => panes.inList() ? panes.open() : openOrPlay() },
     { keys: "l", group: "Panes", desc: "Open (server, channel, member, friend)", in: "lists", run: panes.open },
     { keys: "<Space>e", group: "Panes", desc: "Hide / show channels", run: () => toggle("hideChannels") },
-    { keys: "<Space>m", group: "Panes", desc: "Hide / show members", run: () => keybind("TOGGLE_USERS") },
+    { keys: "<Space>m", group: "Panes", desc: "Hide / show members", run: toggleMembers },
     { keys: "<Space>ue", group: "Panes", desc: "Hide / show channels", run: () => toggle("hideChannels") },
-    { keys: "<Space>um", group: "Panes", desc: "Hide / show members", run: () => keybind("TOGGLE_USERS") },
+    { keys: "<Space>um", group: "Panes", desc: "Hide / show members", run: toggleMembers },
     { keys: "<Space>us", group: "Panes", desc: "Hide / show servers", run: () => toggle("hideServers") },
     { keys: "<Space>uh", group: "Panes", desc: "Hide / show the channel header (pins, search)", run: () => toggle("hideHeader") },
     { keys: "<Space>uz", group: "Panes", desc: "Zoom: only the chat (again to undo)", run: panes.toggleZoom },
@@ -268,7 +268,8 @@ export const bindings: Binding[] = [
     { keys: "i", group: "Other", desc: "Type a message", insert: true, run: focusComposer },
     { keys: "a", group: "Other", desc: "Type a message", insert: true, run: focusComposer },
     { keys: "<Space>p", group: "Other", desc: "Pinned messages", run: () => keybind("TOGGLE_CHANNEL_PINS") },
-    { keys: "<Space>i", group: "Other", desc: "Inbox", run: () => keybind("TOGGLE_INBOX") },
+    { keys: "<Space>i", group: "Other", desc: "Inbox: mentions, unreads, notifications", run: () => keybind("TOGGLE_INBOX") },
+    { keys: "<Space>n", group: "Other", desc: "Inbox: mentions, unreads, notifications", run: () => keybind("TOGGLE_INBOX") },
     { keys: "<Space>a", group: "Other", desc: "Attach a file", run: () => keybind("UPLOAD_FILE") },
 
     // voice

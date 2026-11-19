@@ -407,6 +407,7 @@ export default definePlugin({
         onResize();
         window.addEventListener("keydown", onKeyDown, true);
         document.addEventListener("mousedown", onMouseDown, true);
+        document.addEventListener("mousemove", panes.onMouseMove, { capture: true, passive: true });
         document.addEventListener("focusin", onFocusIn, true);
         document.addEventListener("focusout", schedule, true);
         window.addEventListener("resize", onWindowResize);
@@ -418,6 +419,7 @@ export default definePlugin({
     stop() {
         window.removeEventListener("keydown", onKeyDown, true);
         document.removeEventListener("mousedown", onMouseDown, true);
+        document.removeEventListener("mousemove", panes.onMouseMove, true);
         document.removeEventListener("focusin", onFocusIn, true);
         document.removeEventListener("focusout", schedule, true);
         window.removeEventListener("resize", onWindowResize);

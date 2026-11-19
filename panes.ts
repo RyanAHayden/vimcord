@@ -12,7 +12,7 @@
 import { ChannelStore, SelectedChannelStore, SelectedGuildStore } from "@webpack/common";
 
 import * as cursor from "./cursor";
-import { keybind } from "./discord";
+import { LayerStore, toggleMembers } from "./discord";
 
 export type PaneId = "servers" | "channels" | "messages" | "members";
 export const order: PaneId[] = ["servers", "channels", "messages", "members"];
@@ -111,6 +111,8 @@ let hidden = { servers: false, channels: false };
 let zoomed = false;
 let narrow = false;
 let membersPeeking = false;
+// a hidden list the mouse brought out by going to its edge of the window, shown until the mouse leaves it
+let hoverPeek: "channels" | "members" | null = null;
 let onChange = () => { };
 
 export const current = () => focused;
@@ -151,7 +153,7 @@ export function setNarrow(n: boolean) {
 }
 
 function hides(p: Exclude<PaneId, "messages">) {
-    if (focused === p) return false;
+    if (focused === p || hoverPeek === p) return false;
     if (p === "servers") return hidden.servers || zoomed;
     if (p === "channels") return hidden.channels || zoomed || narrow;
     return zoomed || narrow;
@@ -207,7 +209,7 @@ export function focus(id: PaneId) {
     focused = id;
     if (prev === "members" && id !== "members" && membersPeeking) {
         membersPeeking = false;
-        if (membersShown()) keybind("TOGGLE_USERS");
+        if (membersShown()) toggleMembers();
     }
     applyClasses();
 
@@ -215,7 +217,7 @@ export function focus(id: PaneId) {
     if (id === "members" && !membersShown() && !onFriends()) {
         // no member list in this channel (or it's off): turn it on just while focused
         membersPeeking = true;
-        keybind("TOGGLE_USERS");
+        toggleMembers();
     }
     // the list renders after a peek un-hides it, and a just-opened server's channels take a moment: wait for the
     // open channel to show up so the highlight starts there
@@ -322,11 +324,60 @@ export function onClick(e: MouseEvent) {
         if (!lists[id].container()?.contains(t)) continue;
         const item = t.closest<HTMLElement>("[data-list-item-id]");
         if (item) highlighted[id] = keyOf(item);
-        // clicking a channel opens it, and then you'd want j/k on its messages
-        if (id === "channels" && t.closest("a[href]")) return focus("messages");
+        // clicking a channel opens it, and then you'd want j/k on its messages. This runs on mousedown: wait for the
+        // click to land (it fires right after mouseup), or a narrow window hides the list out from under it
+        if (id === "channels" && t.closest("a[href]")) {
+            if (focused !== id) focus(id);
+            return window.addEventListener("mouseup", () => setTimeout(() => focus("messages")), { capture: true, once: true });
+        }
         if (focused !== id) focus(id);
         return requestAnimationFrame(paint);
     }
+}
+
+// how near its edge of the window the mouse brings out a hidden list: just left of the chat's avatars, and as far in
+// from the right edge
+const ZONE = 24;
+const right = (el: Element | null | undefined) => el?.getClientRects().length ? el.getBoundingClientRect().right : 0;
+let hoverToggled = false;
+
+/** the hover zone's width: from the server bar (or the window's edge) to the chat's avatars */
+function zone(serversEdge: number) {
+    const avatar = document.querySelector('[data-list-id="chat-messages"] img[class*="avatar"]');
+    const left = avatar?.getClientRects().length ? avatar.getBoundingClientRect().left : 0;
+    return left > serversEdge ? left - serversEdge : ZONE;
+}
+
+/** a hidden channel list comes out when the mouse goes near the left edge (just past the chat's avatars), the member
+ * list (a DM's profile) near the right edge, as far in; either goes away again once the mouse leaves it */
+export function onMouseMove(e: MouseEvent) {
+    const x = e.clientX;
+    if (hoverPeek) {
+        // a menu or popout from the list (right-click, a profile) keeps it out while the mouse is in it
+        if ((e.target as Element | null)?.closest?.('[class*="layerContainer_"]')) return;
+        const box = lists[hoverPeek].container()?.getBoundingClientRect();
+        if (!box?.width) return;
+        const inside = hoverPeek === "channels" ? x <= box.right + ZONE : x >= box.left - ZONE;
+        if (inside) return;
+        if (hoverPeek === "members" && hoverToggled && focused !== "members") toggleMembers();
+        hoverPeek = null;
+        hoverToggled = false;
+        return applyClasses();
+    }
+    // nowhere near either edge (the server bar is ~72px): most moves stop here, before any layout is read
+    if (x > 200 && x < window.innerWidth - 200 || e.buttons || LayerStore.hasLayers()) return;
+    const serversEdge = right(lists.servers.container());
+    const w = zone(serversEdge);
+    if (x < serversEdge + w && hides("channels") && lists.channels.container()) hoverPeek = "channels";
+    else if (x > window.innerWidth - w && (hides("members") || !membersShown() && !onFriends())) {
+        hoverPeek = "members";
+        // the member list (a DM's profile) is off in Discord: on just while the mouse is in it, like focusing pane 4
+        if (!membersShown()) {
+            hoverToggled = true;
+            toggleMembers();
+        }
+    } else return;
+    applyClasses();
 }
 
 export function reset() {
@@ -337,6 +388,8 @@ export function reset() {
 export function clear() {
     focused = "messages";
     membersPeeking = false;
+    hoverPeek = null;
+    hoverToggled = false;
     hidden = { servers: false, channels: false };
     zoomed = narrow = false;
     applyClasses();
