@@ -12,7 +12,7 @@ import * as look from "./look";
 import * as panes from "./panes";
 
 function applyHidden() {
-    panes.setHidden({ servers: settings.store.hideServers, channels: settings.store.hideChannels });
+    panes.setHidden({ servers: settings.store.hideServers, channels: settings.store.hideChannels, profile: settings.store.hideProfile });
     document.body.classList.toggle("vimcord-hide-header", settings.store.hideHeader);
 }
 
@@ -64,6 +64,12 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Hide the channel list (Space e). Pressing 2 shows it while it's focused",
         default: false,
+        onChange: applyHidden,
+    },
+    hideProfile: {
+        type: OptionType.BOOLEAN,
+        description: "Hide a DM's profile sidebar until pane 4 is focused (Space m). Off: it stays up as Discord has it",
+        default: true,
         onChange: applyHidden,
     },
     hideServers: {

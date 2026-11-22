@@ -402,6 +402,7 @@ export default definePlugin({
         look.windowButtons(!settings.store.hideWindowButtons);
         keyboardModeOff();
         panes.setOnChange(schedule);
+        panes.watchProfile();
         setOnSettingsChange(schedule);
         applyHidden();
         onResize();

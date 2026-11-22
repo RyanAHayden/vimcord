@@ -80,9 +80,12 @@ const openOrPlay = onMessage(m => {
     if (!(li && hasVideo(m) && playVideo(li))) openLink();
 });
 
-function toggle(key: "hideChannels" | "hideServers" | "hideHeader") {
+function toggle(key: "hideChannels" | "hideServers" | "hideHeader" | "hideProfile") {
     settings.store[key] = !settings.store[key];
 }
+
+// in a DM the members pane is the profile sidebar, which vimcord hides by default: Space m shows or hides it for good
+const toggleMembersPane = () => panes.onDmProfile() ? toggle("hideProfile") : toggleMembers();
 
 const name = (u: any) => u?.globalName ?? u?.global_name ?? u?.username ?? "unknown";
 
@@ -171,9 +174,9 @@ export const bindings: Binding[] = [
     { keys: "<CR>", group: "Panes", desc: "Open (server, channel, member, friend; a message's video or link)", run: () => panes.inList() ? panes.open() : openOrPlay() },
     { keys: "l", group: "Panes", desc: "Open (server, channel, member, friend)", in: "lists", run: panes.open },
     { keys: "<Space>e", group: "Panes", desc: "Hide / show channels", run: () => toggle("hideChannels") },
-    { keys: "<Space>m", group: "Panes", desc: "Hide / show members", run: toggleMembers },
+    { keys: "<Space>m", group: "Panes", desc: "Hide / show members", run: toggleMembersPane },
     { keys: "<Space>ue", group: "Panes", desc: "Hide / show channels", run: () => toggle("hideChannels") },
-    { keys: "<Space>um", group: "Panes", desc: "Hide / show members", run: toggleMembers },
+    { keys: "<Space>um", group: "Panes", desc: "Hide / show members", run: toggleMembersPane },
     { keys: "<Space>us", group: "Panes", desc: "Hide / show servers", run: () => toggle("hideServers") },
     { keys: "<Space>uh", group: "Panes", desc: "Hide / show the channel header (pins, search)", run: () => toggle("hideHeader") },
     { keys: "<Space>uz", group: "Panes", desc: "Zoom: only the chat (again to undo)", run: panes.toggleZoom },

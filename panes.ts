@@ -62,6 +62,9 @@ const friends: ListPane = {
     selected: () => null,
 };
 
+/** a 1:1 DM is open, where pane 4 is the profile sidebar */
+export const onDmProfile = () => !!ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.isDM();
+
 /** the Friends page is showing instead of a chat */
 export const onFriends = () => friendsTabs() != null && !document.querySelector('[data-list-id="chat-messages"]');
 
@@ -107,10 +110,16 @@ const highlighted: Partial<Record<PaneId, string>> = {};
 
 // what's hidden: by the settings (Space e / Space s), by zoom (only the chat), and by a narrow window (channels and
 // members, so the chat gets the room). A focused pane always shows ("peeks").
-let hidden = { servers: false, channels: false };
+let hidden = { servers: false, channels: false, profile: false };
 let zoomed = false;
 let narrow = false;
 let membersPeeking = false;
+let lastDm = false;
+// the member list / profile slides out for LEAVE_MS before it's let go, and Discord's list turned off if we turned it on
+const LEAVE_MS = 200;
+let leaving = false;
+let wasFloating = false;
+let pendingOff = false;
 // a hidden list the mouse brought out by going to its edge of the window, shown until the mouse leaves it
 let hoverPeek: "channels" | "members" | null = null;
 let onChange = () => { };
@@ -120,6 +129,12 @@ export const current = () => focused;
 /** keeps the member list's box marked as Discord re-renders it, and the highlight on the Friends page (called with
  * the rest of the mode display) */
 export function tick() {
+    // moving between a DM and a server changes whether the profile is what's hidden
+    const dm = onDmProfile();
+    if (dm !== lastDm) {
+        lastDm = dm;
+        applyClasses();
+    }
     markMembersBox();
     profileBox();
     if (focused !== "messages" || !onFriends()) return;
@@ -135,7 +150,7 @@ export function membersShown() {
     return lists.members.container() != null;
 }
 
-export function setHidden(h: { servers: boolean; channels: boolean; }) {
+export function setHidden(h: { servers: boolean; channels: boolean; profile: boolean; }) {
     hidden = h;
     applyClasses();
 }
@@ -152,18 +167,44 @@ export function setNarrow(n: boolean) {
     applyClasses();
 }
 
-function hides(p: Exclude<PaneId, "messages">) {
-    if (focused === p || hoverPeek === p) return false;
+function wouldHide(p: Exclude<PaneId, "messages">) {
     if (p === "servers") return hidden.servers || zoomed;
     if (p === "channels") return hidden.channels || zoomed || narrow;
-    return zoomed || narrow;
+    return zoomed || narrow || hidden.profile && onDmProfile();
 }
+
+const peeking = (p: Exclude<PaneId, "messages">) => focused === p || hoverPeek === p || p === "members" && leaving;
+const hides = (p: Exclude<PaneId, "messages">) => !peeking(p) && wouldHide(p);
+const floatsMembers = () => (focused === "members" || hoverPeek === "members")
+    && (wouldHide("members") || membersPeeking || hoverToggled);
 
 function applyClasses() {
     const c = document.body.classList;
+    const floating = floatsMembers();
+    if (wasFloating && !floating && !leaving) {
+        leaving = true;
+        setTimeout(() => {
+            if (pendingOff) {
+                pendingOff = false;
+                if (membersShown()) toggleMembers();
+            }
+            // stays faded out until Discord has dropped the list, or it would show docked for a frame
+            setTimeout(() => {
+                leaving = false;
+                applyClasses();
+            }, 100);
+        }, LEAVE_MS);
+    }
+    wasFloating = floating;
     c.toggle("vimcord-hide-servers", hides("servers"));
     c.toggle("vimcord-hide-channels", hides("channels"));
     c.toggle("vimcord-hide-members", hides("members"));
+    // a hidden list that's showing for focus or the mouse floats over the chat instead of pushing it aside
+    c.toggle("vimcord-peek-servers", peeking("servers") && wouldHide("servers"));
+    c.toggle("vimcord-peek-channels", peeking("channels") && wouldHide("channels"));
+    c.toggle("vimcord-peek-members", floating || leaving);
+    c.toggle("vimcord-leaving", leaving && !floating);
+    document.body.style.setProperty("--vc-peek-left", `${right(lists.servers.container())}px`);
     c.toggle("vimcord-zoom", zoomed);
     c.toggle("vimcord-list-focused", focused !== "messages");
     onChange();
@@ -180,8 +221,28 @@ function markMembersBox() {
 function profileBox() {
     const profile = document.querySelector<HTMLElement>(".user-profile-sidebar");
     const box = profile?.closest<HTMLElement>("aside") ?? profile;
-    if (box && !box.hasAttribute("data-vimcord-profile")) box.setAttribute("data-vimcord-profile", "");
+    if (box && !box.hasAttribute("data-vimcord-profile")) {
+        box.setAttribute("data-vimcord-profile", "");
+        // the column around it, if it's only that, so floating the profile frees the room it held
+        let wrap = box.parentElement;
+        for (let i = 0; i < 3 && wrap?.children.length === 1; i++, wrap = wrap.parentElement) {
+            const w = wrap.getBoundingClientRect().width;
+            if (w < 200 || w > 420) break;
+            wrap.setAttribute("data-vimcord-profile-wrap", "");
+        }
+    }
     return box ?? null;
+}
+
+// Discord draws the DM profile the moment it's shown (a peek, or opening a DM): marking it in the same frame keeps it
+// from showing docked, pushing the chat, until the next tick floats it
+let profileWatch: MutationObserver | null = null;
+
+export function watchProfile() {
+    profileWatch ??= new MutationObserver(() => {
+        if (!document.querySelector("[data-vimcord-profile]")) profileBox();
+    });
+    profileWatch.observe(document.body, { childList: true, subtree: true });
 }
 
 /** the element that scrolls inside el (or el itself) */
@@ -209,7 +270,12 @@ export function focus(id: PaneId) {
     focused = id;
     if (prev === "members" && id !== "members" && membersPeeking) {
         membersPeeking = false;
-        if (membersShown()) toggleMembers();
+        pendingOff = true;
+    }
+    // back to it while it's still sliding out: it's still on, and ours to turn off again
+    if (id === "members" && pendingOff) {
+        pendingOff = false;
+        membersPeeking = true;
     }
     applyClasses();
 
@@ -218,6 +284,7 @@ export function focus(id: PaneId) {
         // no member list in this channel (or it's off): turn it on just while focused
         membersPeeking = true;
         toggleMembers();
+        applyClasses();
     }
     // the list renders after a peek un-hides it, and a just-opened server's channels take a moment: wait for the
     // open channel to show up so the highlight starts there
@@ -359,7 +426,7 @@ export function onMouseMove(e: MouseEvent) {
         if (!box?.width) return;
         const inside = hoverPeek === "channels" ? x <= box.right + ZONE : x >= box.left - ZONE;
         if (inside) return;
-        if (hoverPeek === "members" && hoverToggled && focused !== "members") toggleMembers();
+        if (hoverPeek === "members" && hoverToggled && focused !== "members") pendingOff = true;
         hoverPeek = null;
         hoverToggled = false;
         return applyClasses();
@@ -386,11 +453,14 @@ export function reset() {
 }
 
 export function clear() {
+    profileWatch?.disconnect();
+    profileWatch = null;
     focused = "messages";
     membersPeeking = false;
     hoverPeek = null;
     hoverToggled = false;
-    hidden = { servers: false, channels: false };
+    leaving = wasFloating = pendingOff = false;
+    hidden = { servers: false, channels: false, profile: false };
     zoomed = narrow = false;
     applyClasses();
     paint();
